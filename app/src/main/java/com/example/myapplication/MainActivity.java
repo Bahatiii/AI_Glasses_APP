@@ -3,6 +3,7 @@ package com.example.myapplication;
 import android.os.Bundle;
 import android.widget.Button;
 import android.widget.Toast;
+import android.content.Intent;
 
 import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
@@ -11,7 +12,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 public class MainActivity extends AppCompatActivity {
-    Button btnRecognition, btnNavigation;
+    Button btnRecognition, btnVideo,btnNavigation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -24,12 +25,20 @@ public class MainActivity extends AppCompatActivity {
             return insets;
         });
         btnRecognition = findViewById(R.id.btn_recognition);
+        btnVideo = findViewById(R.id.btn_video);
         btnNavigation = findViewById(R.id.btn_navigation);
 
         // 点击识图模式按钮
         btnRecognition.setOnClickListener(view -> {
             Toast.makeText(this, "进入识图模式", Toast.LENGTH_SHORT).show();
             // TODO：调用识图模式的逻辑
+        });
+
+        // 点击视频模式按钮
+        btnVideo.setOnClickListener(view -> {
+            Toast.makeText(this, "进入视频模式", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, VideoActivity.class);
+            startActivity(intent);
         });
 
         // 点击导航模式按钮
