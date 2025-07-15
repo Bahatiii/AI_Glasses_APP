@@ -26,7 +26,10 @@ import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
+import android.graphics.Canvas;import com.example.myapplication.TTSPlayer;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 
 
 public class VideoActivity extends AppCompatActivity {
@@ -61,6 +64,7 @@ public class VideoActivity extends AppCompatActivity {
         initViews();
         setupWebView();
         setupBackPressedCallback();
+        TTSPlayer.init(this);
 
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
@@ -210,6 +214,7 @@ public class VideoActivity extends AppCompatActivity {
         if (webView != null) {
             webView.destroy();
         }
+        TTSPlayer.shutdown();
     }
     private void captureAndUploadFrame() {
         // 1️⃣ 创建一个与 WebView 大小相同的 Bitmap
@@ -233,10 +238,25 @@ public class VideoActivity extends AppCompatActivity {
             @Override
             public void onSuccess(String resultJson) {
                 runOnUiThread(() -> {
-                    Toast.makeText(VideoActivity.this, "识别成功:\n" + resultJson, Toast.LENGTH_LONG).show();
-                    // TODO: 如果需要 TTS 播报，在这里调用
+                    try {
+                        // 解析百度返回的 JSON，提取第一个识别结果的 keyword
+                        JSONObject json = new JSONObject(resultJson);
+                        JSONArray results = json.getJSONArray("result");
+                        if (results.length() > 0) {
+                            String keyword = results.getJSONObject(0).getString("keyword");
+                            String sentence = "这是一个 " + keyword;
+                            Toast.makeText(VideoActivity.this, sentence, Toast.LENGTH_LONG).show();
+                            TTSPlayer.speak(sentence); // 朗读
+                        } else {
+                            Toast.makeText(VideoActivity.this, "识别失败：未找到结果", Toast.LENGTH_LONG).show();
+                            TTSPlayer.speak("识别失败");
+                        }
+                    } catch (Exception e) {
+                        Toast.makeText(VideoActivity.this, "解析失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
                 });
             }
+
 
             @Override
             public void onError(String errorMessage) {
