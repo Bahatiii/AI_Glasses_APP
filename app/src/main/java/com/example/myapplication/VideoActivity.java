@@ -25,6 +25,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+
 
 public class VideoActivity extends AppCompatActivity {
     private WebView webView;
@@ -39,6 +42,10 @@ public class VideoActivity extends AppCompatActivity {
     private ExecutorService executor;
     private Handler mainHandler;
     private int retryCount = 0;
+
+    private Button btnCapture; // 加在变量声明区
+
+// onCreate() 里添加
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,6 +67,10 @@ public class VideoActivity extends AppCompatActivity {
 
         // 开始检测设备
         checkDeviceConnection();
+
+        btnCapture = findViewById(R.id.btn_capture);
+        btnCapture.setOnClickListener(v -> captureAndUploadFrame());
+
     }
 
     private void initViews() {
@@ -103,6 +114,7 @@ public class VideoActivity extends AppCompatActivity {
             }
         });
     }
+
 
     private void setupBackPressedCallback() {
         OnBackPressedCallback callback = new OnBackPressedCallback(true) {
@@ -199,4 +211,41 @@ public class VideoActivity extends AppCompatActivity {
             webView.destroy();
         }
     }
+    private void captureAndUploadFrame() {
+        // 1️⃣ 创建一个与 WebView 大小相同的 Bitmap
+        int width = webView.getWidth();
+        int height = webView.getHeight();
+        if (width == 0 || height == 0) {
+            Toast.makeText(this, "WebView 大小为 0，无法截图", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+
+        // 2️⃣ 让 WebView 自身把内容绘制到 Canvas 上
+        webView.draw(canvas);
+
+        Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
+
+        // 3️⃣ 调用之前写好的上传方法
+        BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
+            @Override
+            public void onSuccess(String resultJson) {
+                runOnUiThread(() -> {
+                    Toast.makeText(VideoActivity.this, "识别成功:\n" + resultJson, Toast.LENGTH_LONG).show();
+                    // TODO: 如果需要 TTS 播报，在这里调用
+                });
+            }
+
+            @Override
+            public void onError(String errorMessage) {
+                runOnUiThread(() -> {
+                    Toast.makeText(VideoActivity.this, "上传失败：" + errorMessage, Toast.LENGTH_LONG).show();
+                });
+            }
+        });
+    }
+
+
 }
