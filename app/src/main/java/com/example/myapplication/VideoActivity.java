@@ -8,17 +8,20 @@ import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebSettings;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.util.Log;
 import androidx.activity.EdgeToEdge;
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
+import android.webkit.WebResourceResponse;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -38,7 +41,7 @@ public class VideoActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private Button btnRetry;
 
-    private static final String STREAM_URL = "http://esp32-glasses.local/stream";
+    private static final String STREAM_URL = "http://172.20.10.2/stream";
     private static final int TIMEOUT_MS = 5000;
     private static final int MAX_RETRY_COUNT = 3;
 
@@ -90,31 +93,89 @@ public class VideoActivity extends AppCompatActivity {
     }
 
     private void setupWebView() {
-        // 只在确实需要JavaScript时才启用（这里是为了处理图片加载错误）
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.getSettings().setLoadWithOverviewMode(true);
-        webView.getSettings().setUseWideViewPort(true);
-        webView.getSettings().setBuiltInZoomControls(true);
-        webView.getSettings().setDisplayZoomControls(false);
-        // 添加安全设置
-        webView.getSettings().setAllowFileAccess(false);
-        webView.getSettings().setAllowContentAccess(false);
+        WebSettings settings = webView.getSettings();
+
+        // 基本设置
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(true);
+
+        // 缓存设置 - 关键改动
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+
+
+        // 网络和媒体设置
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
+        // 安全设置
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+
+        // 禁用硬件加速（对某些设备的MJPEG支持有帮助）
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return false; // 让WebView处理所有URL
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                Log.d("VideoActivity", "页面开始加载: " + url);
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                showVideoStream();
+                Log.d("VideoActivity", "页面加载完成: " + url);
+
+                // 只有当URL不是about:blank时才显示视频流
+                if (!url.equals("about:blank") && url.contains("172.20.10.2")) {
+                    // 延迟显示，给MJPEG流一些时间建立连接
+                    mainHandler.postDelayed(() -> showVideoStream(), 2000);
+                }
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
+                Log.e("VideoActivity", "WebView错误: " + error.getDescription());
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    showConnectionError("Loading video failed: " + error.getDescription().toString());
+                    showConnectionError("加载失败: " + error.getDescription().toString());
                 } else {
-                    showConnectionError("Loading video failed");
+                    showConnectionError("加载失败");
                 }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                            WebResourceResponse errorResponse) {
+                super.onReceivedHttpError(view, request, errorResponse);
+
+                String url = request.getUrl().toString();
+                Log.e("VideoActivity", "HTTP错误 - URL: " + url);
+
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    int statusCode = errorResponse.getStatusCode();
+                    Log.e("VideoActivity", "HTTP错误码: " + statusCode);
+
+                    if (url.contains("stream")) {
+                        showConnectionError("视频流连接失败: " + statusCode);
+                    }
+                }
+            }
+        });
+
+        // 添加WebChromeClient用于调试
+        webView.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override
+            public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
+                Log.d("WebView", consoleMessage.message());
+                return true;
             }
         });
     }
@@ -154,30 +215,40 @@ public class VideoActivity extends AppCompatActivity {
 
     private boolean pingDevice() {
         try {
-            URL url = new URL(STREAM_URL);
+            Log.d("VideoActivity", "开始ping ESP32: " + "http://172.20.10.2/");
+
+            // 先测试根路径
+            URL url = new URL("http://172.20.10.2/");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("HEAD");
+            connection.setRequestMethod("GET");
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
 
             int responseCode = connection.getResponseCode();
             connection.disconnect();
 
+            Log.d("VideoActivity", "Ping响应码: " + responseCode);
             return responseCode == HttpURLConnection.HTTP_OK;
+
         } catch (IOException e) {
+            Log.e("VideoActivity", "Ping失败: " + e.getMessage());
             return false;
         }
     }
 
     private void loadVideoStream() {
+        Log.d("VideoActivity", "开始加载视频流");
         tvStatus.setText("Successfully connected, loading video...");
 
-        String html = "<html><body style='margin:0;padding:0;background:#000;'>" +
-                "<img src='" + STREAM_URL + "' style='width:100%;height:100%;object-fit:contain;' " +
-                "onerror=\"document.body.innerHTML='<div style=\\'color:white;text-align:center;padding-top:50%;\\'>视频流加载失败</div>'\" />" +
+        // 更简单的HTML
+        String html = "<html><body style='margin:0;background:#000;'>" +
+                "<img src='" + STREAM_URL + "' style='width:100%;height:auto;' />" +
                 "</body></html>";
 
-        webView.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null);
+        Log.d("VideoActivity", "HTML: " + html);
+        Log.d("VideoActivity", "目标URL: " + STREAM_URL);
+
+        webView.loadDataWithBaseURL("http://172.20.10.2/", html, "text/html", "UTF-8", null);
     }
 
     private void showSearchingStatus() {
