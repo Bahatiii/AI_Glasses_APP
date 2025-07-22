@@ -41,7 +41,7 @@ public class VideoActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private Button btnRetry;
 
-    private static final String STREAM_URL = "http://172.20.10.2/stream";
+    private static final String STREAM_URL = "http://172.20.10.3/stream";
     private static final int TIMEOUT_MS = 5000;
     private static final int MAX_RETRY_COUNT = 3;
 
@@ -134,7 +134,7 @@ public class VideoActivity extends AppCompatActivity {
                 Log.d("VideoActivity", "页面加载完成: " + url);
 
                 // 只有当URL不是about:blank时才显示视频流
-                if (!url.equals("about:blank") && url.contains("172.20.10.2")) {
+                if (!url.equals("about:blank") && url.contains("172.20.10.3")) {
                     // 延迟显示，给MJPEG流一些时间建立连接
                     mainHandler.postDelayed(() -> showVideoStream(), 2000);
                 }
@@ -218,7 +218,7 @@ public class VideoActivity extends AppCompatActivity {
             Log.d("VideoActivity", "开始ping ESP32: " + "http://172.20.10.2/");
 
             // 先测试根路径
-            URL url = new URL("http://172.20.10.2/");
+            URL url = new URL("http://172.20.10.3/");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(TIMEOUT_MS);
@@ -248,7 +248,7 @@ public class VideoActivity extends AppCompatActivity {
         Log.d("VideoActivity", "HTML: " + html);
         Log.d("VideoActivity", "目标URL: " + STREAM_URL);
 
-        webView.loadDataWithBaseURL("http://172.20.10.2/", html, "text/html", "UTF-8", null);
+        webView.loadDataWithBaseURL("http://172.20.10.3/", html, "text/html", "UTF-8", null);
     }
 
     private void showSearchingStatus() {
@@ -310,23 +310,31 @@ public class VideoActivity extends AppCompatActivity {
             public void onSuccess(String resultJson) {
                 runOnUiThread(() -> {
                     try {
-                        // 解析百度返回的 JSON，提取第一个识别结果的 keyword
                         JSONObject json = new JSONObject(resultJson);
-                        JSONArray results = json.getJSONArray("result");
-                        if (results.length() > 0) {
-                            String keyword = results.getJSONObject(0).getString("keyword");
-                            String sentence = "这是一个 " + keyword;
+                        JSONArray wordsArray = json.getJSONArray("words_result");
+                        if (wordsArray.length() > 0) {
+                            StringBuilder sb = new StringBuilder();
+                            for (int i = 0; i < wordsArray.length(); i++) {
+                                JSONObject obj = wordsArray.getJSONObject(i);
+                                String word = obj.getString("words");
+                                sb.append(word);
+                                if (i < wordsArray.length() - 1) {
+                                    sb.append("，");
+                                }
+                            }
+                            String sentence = sb.toString();
                             Toast.makeText(VideoActivity.this, sentence, Toast.LENGTH_LONG).show();
-                            TTSPlayer.speak(sentence); // 朗读
+                            TTSPlayer.speak(sentence);
                         } else {
-                            Toast.makeText(VideoActivity.this, "识别失败：未找到结果", Toast.LENGTH_LONG).show();
-                            TTSPlayer.speak("识别失败");
+                            TTSPlayer.speak("识别失败，没有识别到文字");
                         }
+
                     } catch (Exception e) {
-                        Toast.makeText(VideoActivity.this, "解析失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
+                        Toast.makeText(VideoActivity.this, "解析出错：" + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 });
             }
+
 
 
             @Override
