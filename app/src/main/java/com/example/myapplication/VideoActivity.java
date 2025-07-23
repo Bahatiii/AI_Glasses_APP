@@ -41,7 +41,7 @@ public class VideoActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private Button btnRetry;
 
-    private static final String STREAM_URL = "http://172.20.10.3/stream";
+    private static final String STREAM_URL = "http://zhj-genius-boy.local/stream";
     private static final int TIMEOUT_MS = 5000;
     private static final int MAX_RETRY_COUNT = 3;
 
@@ -116,6 +116,14 @@ public class VideoActivity extends AppCompatActivity {
         // 禁用硬件加速（对某些设备的MJPEG支持有帮助）
         webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
+        // 1️⃣ 设置简短的 User-Agent
+        settings.setUserAgentString("ESP32Client");
+
+        // 2️⃣ 禁用 Cookie
+        android.webkit.CookieManager.getInstance().setAcceptCookie(false);
+        android.webkit.CookieManager.getInstance().removeAllCookies(null);
+        android.webkit.CookieManager.getInstance().flush();
+
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
@@ -134,7 +142,7 @@ public class VideoActivity extends AppCompatActivity {
                 Log.d("VideoActivity", "页面加载完成: " + url);
 
                 // 只有当URL不是about:blank时才显示视频流
-                if (!url.equals("about:blank") && url.contains("172.20.10.3")) {
+                if (!url.equals("about:blank") && url.contains("zhj-genius-boy.local")) {
                     // 延迟显示，给MJPEG流一些时间建立连接
                     mainHandler.postDelayed(() -> showVideoStream(), 2000);
                 }
@@ -215,10 +223,8 @@ public class VideoActivity extends AppCompatActivity {
 
     private boolean pingDevice() {
         try {
-            Log.d("VideoActivity", "开始ping ESP32: " + "http://172.20.10.2/");
-
-            // 先测试根路径
-            URL url = new URL("http://172.20.10.3/");
+            Log.d("VideoActivity", "开始ping ESP32: http://zhj-genius-boy.local/");
+            URL url = new URL("http://zhj-genius-boy.local/");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(TIMEOUT_MS);
@@ -248,7 +254,7 @@ public class VideoActivity extends AppCompatActivity {
         Log.d("VideoActivity", "HTML: " + html);
         Log.d("VideoActivity", "目标URL: " + STREAM_URL);
 
-        webView.loadDataWithBaseURL("http://172.20.10.3/", html, "text/html", "UTF-8", null);
+        webView.loadDataWithBaseURL("http://zhj-genius-boy.local/", html, "text/html", "UTF-8", null);
     }
 
     private void showSearchingStatus() {
