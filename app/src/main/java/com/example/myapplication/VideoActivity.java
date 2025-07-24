@@ -26,22 +26,24 @@ import android.webkit.WebResourceResponse;
 import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;import com.example.myapplication.TTSPlayer;
+import android.graphics.Canvas;
 import org.json.JSONArray;
 import org.json.JSONObject;
-
-
+import com.example.myapplication.TTSPlayer;
 
 public class VideoActivity extends AppCompatActivity {
     private WebView webView;
     private TextView tvStatus;
     private ProgressBar progressBar;
     private Button btnRetry;
+    private Button btnCapture;
 
-    private static final String STREAM_URL = "http://zhj-genius-boy.local/stream";
     private static final int TIMEOUT_MS = 5000;
     private static final int MAX_RETRY_COUNT = 3;
 
@@ -49,9 +51,10 @@ public class VideoActivity extends AppCompatActivity {
     private Handler mainHandler;
     private int retryCount = 0;
 
-    private Button btnCapture; // 加在变量声明区
-
-// onCreate() 里添加
+    // UDP相关
+    private volatile String esp32Ip = null;
+    private DatagramSocket udpSocket;
+    private Thread udpListenThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -72,12 +75,10 @@ public class VideoActivity extends AppCompatActivity {
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
 
-        // 开始检测设备
-        checkDeviceConnection();
+        startUdpListen(); // 启动UDP监听
 
         btnCapture = findViewById(R.id.btn_capture);
         btnCapture.setOnClickListener(v -> captureAndUploadFrame());
-
     }
 
     private void initViews() {
@@ -96,14 +97,13 @@ public class VideoActivity extends AppCompatActivity {
         WebSettings settings = webView.getSettings();
 
         // 基本设置
-        settings.setJavaScriptEnabled(true);
+        // settings.setJavaScriptEnabled(true); // 不需要JS可注释
         settings.setDomStorageEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
 
-        // 缓存设置 - 关键改动
+        // 缓存设置
         settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
-
 
         // 网络和媒体设置
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -116,18 +116,10 @@ public class VideoActivity extends AppCompatActivity {
         // 禁用硬件加速（对某些设备的MJPEG支持有帮助）
         webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
-        // 1️⃣ 设置简短的 User-Agent
-        settings.setUserAgentString("ESP32Client");
-
-        // 2️⃣ 禁用 Cookie
-        android.webkit.CookieManager.getInstance().setAcceptCookie(false);
-        android.webkit.CookieManager.getInstance().removeAllCookies(null);
-        android.webkit.CookieManager.getInstance().flush();
-
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false; // 让WebView处理所有URL
+                return false;
             }
 
             @Override
@@ -141,9 +133,8 @@ public class VideoActivity extends AppCompatActivity {
                 super.onPageFinished(view, url);
                 Log.d("VideoActivity", "页面加载完成: " + url);
 
-                // 只有当URL不是about:blank时才显示视频流
-                if (!url.equals("about:blank") && url.contains("zhj-genius-boy.local")) {
-                    // 延迟显示，给MJPEG流一些时间建立连接
+                // 只有当URL不是about:blank且包含当前esp32Ip时才显示视频流
+                if (!url.equals("about:blank") && esp32Ip != null && url.contains(esp32Ip)) {
                     mainHandler.postDelayed(() -> showVideoStream(), 2000);
                 }
             }
@@ -152,11 +143,7 @@ public class VideoActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 super.onReceivedError(view, request, error);
                 Log.e("VideoActivity", "WebView错误: " + error.getDescription());
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    showConnectionError("加载失败: " + error.getDescription().toString());
-                } else {
-                    showConnectionError("加载失败");
-                }
+                showConnectionError("加载失败: " + error.getDescription().toString());
             }
 
             @Override
@@ -167,18 +154,16 @@ public class VideoActivity extends AppCompatActivity {
                 String url = request.getUrl().toString();
                 Log.e("VideoActivity", "HTTP错误 - URL: " + url);
 
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                    int statusCode = errorResponse.getStatusCode();
-                    Log.e("VideoActivity", "HTTP错误码: " + statusCode);
+                int statusCode = errorResponse.getStatusCode();
+                Log.e("VideoActivity", "HTTP错误码: " + statusCode);
 
-                    if (url.contains("stream")) {
-                        showConnectionError("视频流连接失败: " + statusCode);
-                    }
+                if (url.contains("stream")) {
+                    showConnectionError("视频流连接失败: " + statusCode);
                 }
+
             }
         });
 
-        // 添加WebChromeClient用于调试
         webView.setWebChromeClient(new android.webkit.WebChromeClient() {
             @Override
             public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
@@ -187,7 +172,6 @@ public class VideoActivity extends AppCompatActivity {
             }
         });
     }
-
 
     private void setupBackPressedCallback() {
         OnBackPressedCallback callback = new OnBackPressedCallback(true) {
@@ -199,7 +183,58 @@ public class VideoActivity extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, callback);
     }
 
+    // UDP监听线程，自动获取ESP32 IP
+    private void startUdpListen() {
+        udpListenThread = new Thread(() -> {
+            try {
+                udpSocket = new DatagramSocket(45678, InetAddress.getByName("0.0.0.0"));
+                udpSocket.setBroadcast(true);
+                byte[] buf = new byte[64];
+                while (!Thread.currentThread().isInterrupted()) {
+                    DatagramPacket packet = new DatagramPacket(buf, buf.length);
+                    udpSocket.receive(packet);
+                    String msg = new String(packet.getData(), 0, packet.getLength()).trim();
+                    if (msg.startsWith("ESP32CAM:")) {
+                        String ip = msg.substring("ESP32CAM:".length());
+                        if (ip.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
+                            Log.d("UDP", "收到ESP32 IP: " + ip);
+                            if (!ip.equals(esp32Ip)) {
+                                esp32Ip = ip;
+                                runOnUiThread(this::checkDeviceConnection);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                Log.e("UDP", "UDP监听异常: " + e.getMessage());
+            }
+        });
+        udpListenThread.start();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (executor != null && !executor.isShutdown()) {
+            executor.shutdown();
+        }
+        if (webView != null) {
+            webView.destroy();
+        }
+        if (udpListenThread != null && udpListenThread.isAlive()) {
+            udpListenThread.interrupt();
+        }
+        if (udpSocket != null && !udpSocket.isClosed()) {
+            udpSocket.close();
+        }
+        TTSPlayer.shutdown();
+    }
+
     private void checkDeviceConnection() {
+        if (esp32Ip == null) {
+            showConnectionError("未收到ESP32 IP广播，请确认设备已上电且与手机同一WiFi");
+            return;
+        }
         showSearchingStatus();
 
         executor.execute(() -> {
@@ -211,7 +246,6 @@ public class VideoActivity extends AppCompatActivity {
                 } else {
                     retryCount++;
                     if (retryCount < MAX_RETRY_COUNT) {
-                        // 延迟后重试
                         mainHandler.postDelayed(this::checkDeviceConnection, 2000);
                     } else {
                         showConnectionError("No devices found, please check");
@@ -222,9 +256,11 @@ public class VideoActivity extends AppCompatActivity {
     }
 
     private boolean pingDevice() {
+        if (esp32Ip == null) return false;
         try {
-            Log.d("VideoActivity", "开始ping ESP32: http://zhj-genius-boy.local/");
-            URL url = new URL("http://zhj-genius-boy.local/");
+            String urlStr = "http://" + esp32Ip + "/";
+            Log.d("VideoActivity", "开始ping ESP32: " + urlStr);
+            URL url = new URL(urlStr);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(TIMEOUT_MS);
@@ -243,18 +279,20 @@ public class VideoActivity extends AppCompatActivity {
     }
 
     private void loadVideoStream() {
+        if (esp32Ip == null) return;
         Log.d("VideoActivity", "开始加载视频流");
         tvStatus.setText("Successfully connected, loading video...");
 
-        // 更简单的HTML
-        String html = "<html><body style='margin:0;background:#000;'>" +
-                "<img src='" + STREAM_URL + "' style='width:100%;height:auto;' />" +
+        String streamUrl = "http://" + esp32Ip + "/stream";
+        // 让图片宽度100%，高度自适应，始终铺满页面宽度
+        String html = "<html><body style='margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;width:100vw;'>" +
+                "<img src='" + streamUrl + "' style='width:100vw;height:auto;display:block;' />" +
                 "</body></html>";
 
         Log.d("VideoActivity", "HTML: " + html);
-        Log.d("VideoActivity", "目标URL: " + STREAM_URL);
+        Log.d("VideoActivity", "目标URL: " + streamUrl);
 
-        webView.loadDataWithBaseURL("http://zhj-genius-boy.local/", html, "text/html", "UTF-8", null);
+        webView.loadDataWithBaseURL("http://" + esp32Ip + "/", html, "text/html", "UTF-8", null);
     }
 
     private void showSearchingStatus() {
@@ -282,19 +320,7 @@ public class VideoActivity extends AppCompatActivity {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (executor != null && !executor.isShutdown()) {
-            executor.shutdown();
-        }
-        if (webView != null) {
-            webView.destroy();
-        }
-        TTSPlayer.shutdown();
-    }
     private void captureAndUploadFrame() {
-        // 1️⃣ 创建一个与 WebView 大小相同的 Bitmap
         int width = webView.getWidth();
         int height = webView.getHeight();
         if (width == 0 || height == 0) {
@@ -304,13 +330,10 @@ public class VideoActivity extends AppCompatActivity {
 
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
-
-        // 2️⃣ 让 WebView 自身把内容绘制到 Canvas 上
         webView.draw(canvas);
 
         Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
 
-        // 3️⃣ 调用之前写好的上传方法
         BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
             @Override
             public void onSuccess(String resultJson) {
@@ -334,14 +357,11 @@ public class VideoActivity extends AppCompatActivity {
                         } else {
                             TTSPlayer.speak("识别失败，没有识别到文字");
                         }
-
                     } catch (Exception e) {
                         Toast.makeText(VideoActivity.this, "解析出错：" + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 });
             }
-
-
 
             @Override
             public void onError(String errorMessage) {
@@ -351,6 +371,4 @@ public class VideoActivity extends AppCompatActivity {
             }
         });
     }
-
-
 }
