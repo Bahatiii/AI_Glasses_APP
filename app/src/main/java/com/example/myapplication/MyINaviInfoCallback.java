@@ -6,7 +6,7 @@ import android.view.View;
 import com.amap.api.navi.INaviInfoCallback;
 import com.amap.api.navi.model.AMapNaviLocation;
 
-public class MyINaviInfoCallback implements INaviInfoCallback {
+public abstract class MyINaviInfoCallback implements INaviInfoCallback {
 
     /**
      * 导航初始化失败时的回调函数
