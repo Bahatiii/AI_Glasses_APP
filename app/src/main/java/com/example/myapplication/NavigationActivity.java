@@ -36,6 +36,24 @@ import com.amap.api.navi.model.NaviInfo;
 import com.amap.api.navi.model.NaviLatLng;
 import com.amap.api.maps.MapsInitializer;
 
+import android.widget.EditText;
+import android.widget.ListView;
+import android.widget.ArrayAdapter;
+import android.text.TextWatcher;
+import android.text.Editable;
+
+import com.amap.api.services.help.Inputtips;
+import com.amap.api.services.help.InputtipsQuery;
+import com.amap.api.services.help.Tip;
+import com.amap.api.services.geocoder.GeocodeSearch;
+import com.amap.api.services.geocoder.GeocodeQuery;
+import com.amap.api.services.geocoder.GeocodeAddress;
+import com.amap.api.services.geocoder.GeocodeResult;
+import com.amap.api.services.geocoder.GeocodeSearch.OnGeocodeSearchListener;
+import com.amap.api.services.core.LatLonPoint;
+import java.util.List;
+import java.util.ArrayList;
+import android.view.View;
 
 public class NavigationActivity extends AppCompatActivity implements AMapNaviListener{
 
@@ -46,8 +64,12 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     private AMapNaviView mAMapNaviView;
 
     private NaviLatLng mStartLatLng;
-    private NaviLatLng mEndLatLng = new NaviLatLng(30.245555, 120.185944); // 杭州大剧院
+    private NaviLatLng mEndLatLng = new NaviLatLng(23.00523804, 113.374652);
 
+    private EditText etSearch;
+    private ListView lvTips;
+    private ArrayAdapter<String> tipsAdapter;
+    private List<Tip> tipList = new ArrayList<>();
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -57,6 +79,9 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         MapsInitializer.updatePrivacyAgree(this, true);
 
         setContentView(R.layout.activity_navigation);
+        // 初始化TTS并播报提示
+        TTSPlayer.init(this);
+        TTSPlayer.speak("请选择您要去哪里？");
 
         // 权限检查及后续逻辑
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
@@ -72,6 +97,83 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             initNavi(savedInstanceState);
             startLocation();
         }
+
+        // 搜索终点相关初始化
+        etSearch = findViewById(R.id.et_search);
+        lvTips = findViewById(R.id.lv_tips);
+        tipsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        lvTips.setAdapter(tipsAdapter);
+
+        etSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                if (s.length() > 0) {
+                    InputtipsQuery query = new InputtipsQuery(s.toString(), "");
+                    Inputtips inputTips = new Inputtips(NavigationActivity.this, query);
+                    inputTips.setInputtipsListener((list, rCode) -> {
+                        if (rCode == 1000 && list != null) {
+                            tipList = list;
+                            List<String> names = new ArrayList<>();
+                            for (Tip tip : list) {
+                                names.add(tip.getName());
+                            }
+                            tipsAdapter.clear();
+                            tipsAdapter.addAll(names);
+                            tipsAdapter.notifyDataSetChanged();
+                            lvTips.setVisibility(View.VISIBLE);
+                        } else {
+                            lvTips.setVisibility(View.GONE);
+                        }
+                    });
+                    inputTips.requestInputtipsAsyn();
+                } else {
+                    lvTips.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        lvTips.setOnItemClickListener((parent, view, position, id) -> {
+            Tip tip = tipList.get(position);
+            etSearch.setText(tip.getName());
+            lvTips.setVisibility(View.GONE);
+
+            // 优先用Tip自带坐标
+            if (tip.getPoint() != null) {
+                mEndLatLng = new NaviLatLng(tip.getPoint().getLatitude(), tip.getPoint().getLongitude());
+                Toast.makeText(this, "已选终点: " + tip.getName(), Toast.LENGTH_SHORT).show();
+                startWalkNavigation();
+            } else {
+                // 若无坐标，用地理编码查找
+                try {
+                    GeocodeSearch geocodeSearch = new GeocodeSearch(this);
+                    geocodeSearch.setOnGeocodeSearchListener(new OnGeocodeSearchListener() {
+                        @Override
+                        public void onGeocodeSearched(GeocodeResult result, int rCode) {
+                            if (rCode == 1000 && result != null && result.getGeocodeAddressList().size() > 0) {
+                                GeocodeAddress address = result.getGeocodeAddressList().get(0);
+                                mEndLatLng = new NaviLatLng(address.getLatLonPoint().getLatitude(), address.getLatLonPoint().getLongitude());
+                                Toast.makeText(NavigationActivity.this, "已选终点: " + tip.getName(), Toast.LENGTH_SHORT).show();
+                                startWalkNavigation();
+                            } else {
+                                Toast.makeText(NavigationActivity.this, "未找到终点坐标", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                        @Override
+                        public void onRegeocodeSearched(com.amap.api.services.geocoder.RegeocodeResult regeocodeResult, int i) {}
+                    });
+                    geocodeSearch.getFromLocationNameAsyn(new GeocodeQuery(tip.getName(), ""));
+                } catch (com.amap.api.services.core.AMapException e) {
+                    e.printStackTrace();
+                    Toast.makeText(NavigationActivity.this, "地理编码初始化失败", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
     }
 
 
@@ -114,9 +216,12 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 @Override
                 public void onLocationChanged(AMapLocation location) {
                     if (location != null && location.getErrorCode() == 0) {
+                        Log.d("导航调试", "定位成功，lat=" + location.getLatitude() + ", lon=" + location.getLongitude());
                         mStartLatLng = new NaviLatLng(location.getLatitude(), location.getLongitude());
-                        startWalkNavigation();
+                        //startWalkNavigation();
                     } else {
+                        Log.e("导航调试", "定位失败，errorCode=" + (location != null ? location.getErrorCode() : "null")
+                                + ", errorInfo=" + (location != null ? location.getErrorInfo() : "null"));
                         Toast.makeText(getApplicationContext(),
                                 "定位失败：" + (location != null ? location.getErrorInfo() : "null"),
                                 Toast.LENGTH_LONG).show();
@@ -133,11 +238,16 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
     private void startWalkNavigation() {
         if (mStartLatLng == null || mEndLatLng == null) {
+            Log.e("导航调试", "起点或终点为空，mStartLatLng=" + mStartLatLng + ", mEndLatLng=" + mEndLatLng);
             Toast.makeText(this, "起点或终点为空", Toast.LENGTH_SHORT).show();
             return;
         }
+        Log.d("导航调试", "开始路径规划，起点: " + mStartLatLng.getLatitude() + "," + mStartLatLng.getLongitude()
+                + " 终点: " + mEndLatLng.getLatitude() + "," + mEndLatLng.getLongitude());
         boolean result = mAMapNavi.calculateWalkRoute(mStartLatLng, mEndLatLng);
+        Log.d("导航调试", "calculateWalkRoute返回值: " + result);
         if (!result) {
+            Log.e("导航调试", "calculateWalkRoute方法直接返回false，说明参数有误或导航未初始化");
             Toast.makeText(this, "路径规划失败", Toast.LENGTH_SHORT).show();
         }
     }
@@ -310,6 +420,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
     @Override
     public void onCalculateRouteFailure(AMapCalcRouteResult result) {
+        Log.e("导航调试", "路径规划失败回调，错误码：" + result.getErrorCode() + "，info=" + result.getErrorDescription());
         Toast.makeText(this, "路径规划失败，错误码：" + result.getErrorCode(), Toast.LENGTH_LONG).show();
     }
 
@@ -348,6 +459,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             locationClient.stopLocation();
             locationClient.onDestroy();
         }
+        TTSPlayer.shutdown();
     }
 
     @Override

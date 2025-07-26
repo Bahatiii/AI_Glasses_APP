@@ -20,15 +20,23 @@ public class TTSPlayer {
                     Log.d("TTSPlayer", "setLanguage result: " + result);
                     if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
                         Log.e("TTSPlayer", "中文不支持，尝试英文");
-                        tts.setLanguage(Locale.US);
+                        result = tts.setLanguage(Locale.US);
+                    }
+                    if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.e("TTSPlayer", "TTS语言不可用");
+                        isReady = false;
+                        pendingText = null;
+                        return;
                     }
                     isReady = true;
                     if (pendingText != null) {
                         tts.speak(pendingText, TextToSpeech.QUEUE_FLUSH, null, null);
                         pendingText = null;
                     }
-                    // 测试播报
-                    tts.speak("语音初始化成功", TextToSpeech.QUEUE_ADD, null, null);
+                } else {
+                    Log.e("TTSPlayer", "TTS初始化失败");
+                    isReady = false;
+                    pendingText = null;
                 }
             });
         }
