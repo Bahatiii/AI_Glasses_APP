@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/navi_container"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".NavigationActivity">
+
+    <!-- 地图和导航容器 -->
+    <FrameLayout
+        android:id="@+id/navi_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
     <!-- 顶部搜索栏和提示列表 -->
     <LinearLayout
@@ -14,7 +19,8 @@
         android:layout_height="wrap_content"
         android:padding="12dp"
         android:background="#CCFFFFFF"
-        android:elevation="4dp">
+        android:elevation="4dp"
+        android:layout_alignParentTop="true">
 
         <EditText
             android:id="@+id/et_search"
@@ -31,4 +37,19 @@
             android:layout_height="150dp"
             android:visibility="gone"/>
     </LinearLayout>
-</FrameLayout>
+
+    <!-- 右下角悬浮麦克风按钮 -->
+    <ImageButton
+        android:id="@+id/btn_voice"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_margin="16dp"
+        android:background="@android:drawable/btn_default"
+        android:src="@android:drawable/ic_btn_speak_now"
+        android:contentDescription="语音输入"
+        android:scaleType="centerInside"
+        android:elevation="8dp"/>
+
+</RelativeLayout>

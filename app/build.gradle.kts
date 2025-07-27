@@ -15,7 +15,7 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
+    sourceSets["main"].jniLibs.srcDirs("libs")
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -42,6 +42,6 @@ dependencies {
     implementation(
         files("libs/AMap3DMap_10.1.201_AMapNavi_10.1.201_AMapSearch_9.7.4_AMapLocation_6.4.9_20250326.aar")
     )
+    implementation(files("libs/Msc.jar"))
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
-
 }

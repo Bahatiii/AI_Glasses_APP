@@ -12,10 +12,14 @@ pluginManagement {
         // 网易镜像
         maven { setUrl("https://mirrors.163.com/maven/repository/maven-public/") }
 
+        // 讯飞官方仓库（添加）
+        maven { setUrl("https://repo.iflytek.cn/repository/maven-public/") }
+
         mavenCentral()
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
@@ -30,6 +34,9 @@ dependencyResolutionManagement {
         maven { setUrl("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/") }
         // 网易镜像
         maven { setUrl("https://mirrors.163.com/maven/repository/maven-public/") }
+
+        // 讯飞官方仓库（添加）
+        maven { setUrl("https://repo.iflytek.cn/repository/maven-public/") }
 
         google()
         mavenCentral()
