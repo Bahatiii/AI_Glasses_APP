@@ -42,4 +42,6 @@ dependencies {
     implementation(
         files("libs/AMap3DMap_10.1.201_AMapNavi_10.1.201_AMapSearch_9.7.4_AMapLocation_6.4.9_20250326.aar")
     )
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
+
 }
