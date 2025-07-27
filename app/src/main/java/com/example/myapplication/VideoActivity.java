@@ -50,11 +50,42 @@ public class VideoActivity extends AppCompatActivity {
     private ExecutorService executor;
     private Handler mainHandler;
     private int retryCount = 0;
+    private OnnxDetector onnxDetector;
+
 
     // UDP相关
     private volatile String esp32Ip = null;
     private DatagramSocket udpSocket;
     private Thread udpListenThread;
+    private final int AUTO_DETECT_INTERVAL_MS = 1000; // 1秒一次，可调
+    private final Handler detectHandler = new Handler(Looper.getMainLooper());
+    private final Runnable detectRunnable = new Runnable() {
+        @Override
+        public void run() {
+            autoDetectFrame();
+            detectHandler.postDelayed(this, AUTO_DETECT_INTERVAL_MS);
+        }
+    };
+
+    private void autoDetectFrame() {
+        if (webView.getWidth() == 0 || webView.getHeight() == 0) {
+            return; // WebView未布局好，跳过
+        }
+        Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        webView.draw(canvas);
+
+        // ONNX模型推理
+        executor.execute(() -> {
+            String result = onnxDetector.detect(bitmap);
+            if (result != null && !result.isEmpty()) {
+                mainHandler.post(() -> {
+                    // 播报识别结果
+                    TTSPlayer.speak("前方检测到：" + result);
+                });
+            }
+        });
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,7 +102,7 @@ public class VideoActivity extends AppCompatActivity {
         setupWebView();
         setupBackPressedCallback();
         TTSPlayer.init(this);
-
+        onnxDetector = new OnnxDetector(this);
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
 
@@ -227,6 +258,7 @@ public class VideoActivity extends AppCompatActivity {
         if (udpSocket != null && !udpSocket.isClosed()) {
             udpSocket.close();
         }
+        detectHandler.removeCallbacks(detectRunnable);
         TTSPlayer.shutdown();
     }
 
@@ -309,6 +341,7 @@ public class VideoActivity extends AppCompatActivity {
         webView.setVisibility(View.VISIBLE);
 
         Toast.makeText(this, "视频流连接成功", Toast.LENGTH_SHORT).show();
+        detectHandler.postDelayed(detectRunnable, AUTO_DETECT_INTERVAL_MS);
     }
 
     private void showConnectionError(String message) {
