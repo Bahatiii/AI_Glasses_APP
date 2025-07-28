@@ -43,13 +43,12 @@ public class OnnxDetector {
     }
 
     private float[][][][] preprocess(Bitmap bitmap) {
-        Bitmap resized = Bitmap.createScaledBitmap(bitmap, INPUT_SIZE, INPUT_SIZE, true);
-        int width = resized.getWidth();
-        int height = resized.getHeight();
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
 
-        float[][][][] input = new float[1][3][INPUT_SIZE][INPUT_SIZE];
+        float[][][][] input = new float[1][3][height][width];
         int[] pixels = new int[width * height];
-        resized.getPixels(pixels, 0, width, 0, 0, width, height);
+        bitmap.getPixels(pixels, 0, width, 0, 0, width, height);
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
@@ -67,34 +66,43 @@ public class OnnxDetector {
         return input;
     }
 
+
     public String detect(Bitmap bitmap) {
         if (lightSession == null || carSession == null) {
             return "模型未加载";
         }
 
         Set<String> allDetectedClasses = new HashSet<>();
-        float[][][][] inputData = preprocess(bitmap);
+        try {
+            // 预处理两个模型的输入，注意如果两个模型输入尺寸不同，可以分别resize Bitmap后调用preprocess
+            Bitmap resizedForLight = Bitmap.createScaledBitmap(bitmap, 640, 640, true);   // 例：红绿灯模型输入640x640
+            Bitmap resizedForCar = Bitmap.createScaledBitmap(bitmap, bitmap.getWidth(), bitmap.getHeight(), true); // 车辆模型保持原尺寸或也可自定义尺寸
 
-        try (OnnxTensor inputTensor = OnnxTensor.createTensor(env, inputData)) {
+            float[][][][] inputLight = preprocess(resizedForLight);
+            float[][][][] inputCar = preprocess(resizedForCar);
 
-            // 🔴 推理红绿灯模型
-            try (OrtSession.Result results = lightSession.run(
-                    java.util.Collections.singletonMap(lightSession.getInputNames().iterator().next(), inputTensor))) {
-                float[][][] outputArray = (float[][][]) results.get(0).getValue();
-                allDetectedClasses.addAll(parseOutput(outputArray, true));
+            try (OnnxTensor inputTensorLight = OnnxTensor.createTensor(env, inputLight);
+                 OnnxTensor inputTensorCar = OnnxTensor.createTensor(env, inputCar)) {
+
+                // 红绿灯模型推理
+                try (OrtSession.Result results = lightSession.run(
+                        java.util.Collections.singletonMap(lightSession.getInputNames().iterator().next(), inputTensorLight))) {
+                    float[][][] outputArray = (float[][][]) results.get(0).getValue();
+                    allDetectedClasses.addAll(parseOutput(outputArray, true));
+                }
+
+                // 车辆模型推理
+                try (OrtSession.Result results = carSession.run(
+                        java.util.Collections.singletonMap(carSession.getInputNames().iterator().next(), inputTensorCar))) {
+                    float[][][] outputArray = (float[][][]) results.get(0).getValue();
+                    allDetectedClasses.addAll(parseOutput(outputArray, false));
+                }
             }
-
-            // 🚗 推理车辆模型
-            try (OrtSession.Result results = carSession.run(
-                    java.util.Collections.singletonMap(carSession.getInputNames().iterator().next(), inputTensor))) {
-                float[][][] outputArray = (float[][][]) results.get(0).getValue();
-                allDetectedClasses.addAll(parseOutput(outputArray, false));
-            }
-
         } catch (Exception e) {
             Log.e(TAG, "ONNX 推理出错", e);
             return "推理错误";
         }
+
 
         if (allDetectedClasses.isEmpty()) {
             return "未检测到目标";
