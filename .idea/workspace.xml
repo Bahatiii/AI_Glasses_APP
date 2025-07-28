@@ -26,18 +26,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="语音识别半路开香槟版（未初始化版）">
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/libs/Msc.jar" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/libs/Sunflower.jar" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/libs/armeabi/libmsc.so" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/JsonParser.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_navigation.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_navigation.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
-    </list>
+    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="换了个集成包" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -46,7 +35,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=L7P6R21A14000492)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=C:\Users\gengke\.android\avd\Pixel_3a_XL.avd)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -215,7 +204,23 @@
       <option name="project" value="LOCAL" />
       <updated>1753604785748</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="换了个集成包">
+      <option name="closed" value="true" />
+      <created>1753692985384</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1753692985384</updated>
+    </task>
+    <task id="LOCAL-00004" summary="换了个集成包">
+      <option name="closed" value="true" />
+      <created>1753692996554</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1753692996554</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -223,14 +228,25 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="语音识别半路开香槟版（未初始化版）" />
-    <option name="LAST_COMMIT_MESSAGE" value="语音识别半路开香槟版（未初始化版）" />
+    <MESSAGE value="换了个集成包" />
+    <option name="LAST_COMMIT_MESSAGE" value="换了个集成包" />
   </component>
   <component name="play_dynamic_filters_status">
     <option name="appIdToCheckInfo">
       <map>
+        <entry key="com.baidu.aip.asrwakeup3.core.test">
+          <value>
+            <CheckInfo lastCheckTimestamp="1753692997622" />
+          </value>
+        </entry>
+        <entry key="com.baidu.aip.asrwakeup3.uiasr.test">
+          <value>
+            <CheckInfo lastCheckTimestamp="1753692997621" />
+          </value>
+        </entry>
         <entry key="com.example.myapplication">
           <value>
-            <CheckInfo lastCheckTimestamp="1753604780320" />
+            <CheckInfo lastCheckTimestamp="1753692989811" />
           </value>
         </entry>
         <entry key="com.example.myapplication.core.test">
@@ -240,7 +256,7 @@
         </entry>
         <entry key="com.example.myapplication.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1753604780356" />
+            <CheckInfo lastCheckTimestamp="1753692989811" />
           </value>
         </entry>
         <entry key="com.example.myapplication.uiasr.test">
