@@ -42,6 +42,7 @@ dependencies {
     implementation(
         files("libs/AMap3DMap_10.1.201_AMapNavi_10.1.201_AMapSearch_9.7.4_AMapLocation_6.4.9_20250326.aar")
     )
-    implementation(files("libs/Msc.jar"))
+    implementation(project(":core"))
+    implementation(project(":uiasr"))
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
 }

@@ -12,7 +12,7 @@ pluginManagement {
         // 网易镜像
         maven { setUrl("https://mirrors.163.com/maven/repository/maven-public/") }
 
-        // 讯飞官方仓库（添加）
+        // 讯飞官方仓库（可保留，也不影响百度）
         maven { setUrl("https://repo.iflytek.cn/repository/maven-public/") }
 
         mavenCentral()
@@ -35,7 +35,7 @@ dependencyResolutionManagement {
         // 网易镜像
         maven { setUrl("https://mirrors.163.com/maven/repository/maven-public/") }
 
-        // 讯飞官方仓库（添加）
+        // 讯飞官方仓库（可保留，也不影响百度）
         maven { setUrl("https://repo.iflytek.cn/repository/maven-public/") }
 
         google()
@@ -47,4 +47,8 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "My Application"
+
+// 添加百度语音识别 Demo 模块
 include(":app")
+include(":core")
+include(":uiasr")
