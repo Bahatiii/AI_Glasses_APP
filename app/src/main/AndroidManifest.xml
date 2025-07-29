@@ -28,6 +28,13 @@
         <meta-data
             android:name="IFLYTEK_APPID"
             android:value="8591e1f6" />
+
+        <activity
+            android:name=".AIChatActivity"
+            android:exported="false"
+            android:label="AI模式"
+            android:parentActivityName=".MainActivity" />
+
         <activity
             android:name=".VideoActivity"
             android:exported="false"
