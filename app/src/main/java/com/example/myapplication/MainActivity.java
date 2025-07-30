@@ -14,7 +14,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 
 public class MainActivity extends AppCompatActivity {
-    Button btnRecognition, btnVideo,btnNavigation;
+    Button btnAI, btnVideo, btnNavigation;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,14 +26,15 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        btnRecognition = findViewById(R.id.btn_recognition);
+        btnAI = findViewById(R.id.btn_ai);
         btnVideo = findViewById(R.id.btn_video);
         btnNavigation = findViewById(R.id.btn_navigation);
 
-        // 点击识图模式按钮
-        btnRecognition.setOnClickListener(view -> {
-            Toast.makeText(this, "进入识图模式", Toast.LENGTH_SHORT).show();
-            // TODO：调用识图模式的逻辑
+        // 点击AI模式按钮
+        btnAI.setOnClickListener(view -> {
+            Toast.makeText(this, "进入AI模式", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, AIChatActivity.class);
+            startActivity(intent);
         });
 
         // 点击视频模式按钮
@@ -46,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
         // 点击导航模式按钮
         btnNavigation.setOnClickListener(view -> {
             Toast.makeText(this, "进入导航模式", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(MainActivity.this, com.example.myapplication.NavigationActivity.class);
+            Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
             startActivity(intent);
                 }
         );
