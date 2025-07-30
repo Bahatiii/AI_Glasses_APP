@@ -80,7 +80,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         lvTips.setAdapter(tipsAdapter);
 
         // 获取百度语音 Access Token
-        accessToken = TokenManager.getToken(this);
+
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED ||
@@ -164,7 +164,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     /** 初始化语音识别，使用 token 鉴权 */
     private void initSpeechRecognizer() {
         recogParams = new HashMap<>();
-        recogParams.put("token", "24.df4d9c25091befb3054b3b3583c1755d.2592000.1756440191.282335-119639331");
+        recogParams.put("token", "24.37ac1dc1bfcee56c5c701ee0866e56e1.2592000.1756451925.282335-119645819");
         recogParams.put(SpeechConstant.VAD, SpeechConstant.VAD_TOUCH);
         recogParams.put(SpeechConstant.DECODER, 0);
         recogParams.put(SpeechConstant.PID, 1537);
