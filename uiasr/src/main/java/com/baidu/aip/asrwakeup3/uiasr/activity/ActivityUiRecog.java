@@ -5,9 +5,10 @@ import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.Message;
 import android.preference.PreferenceManager;
-import android.util.Log;
 import android.view.View;
 import com.baidu.aip.asrwakeup3.core.recog.IStatus;
+import com.baidu.aip.asrwakeup3.core.util.AuthUtil;
+import com.baidu.aip.asrwakeup3.uiasr.R;
 import com.baidu.aip.asrwakeup3.uiasr.params.AllRecogParams;
 import com.baidu.aip.asrwakeup3.uiasr.params.CommonRecogParams;
 import com.baidu.aip.asrwakeup3.uiasr.params.NluRecogParams;
@@ -17,6 +18,7 @@ import com.baidu.aip.asrwakeup3.uiasr.setting.AllSetting;
 import com.baidu.aip.asrwakeup3.uiasr.setting.NluSetting;
 import com.baidu.aip.asrwakeup3.uiasr.setting.OfflineSetting;
 import com.baidu.aip.asrwakeup3.uiasr.setting.OnlineSetting;
+import com.baidu.speech.asr.SpeechConstant;
 
 import java.util.Map;
 
@@ -104,6 +106,11 @@ public abstract class ActivityUiRecog extends ActivityCommon implements IStatus 
         SharedPreferences sp = PreferenceManager.getDefaultSharedPreferences(this);
         //  上面的获取是为了生成下面的Map， 自己集成时可以忽略
         Map<String, Object> params = apiParams.fetch(sp);
+        params.put(SpeechConstant.APP_ID, AuthUtil.getAppId()); // 添加appId
+        params.put(SpeechConstant.APP_KEY, AuthUtil.getAk()); // 添加apiKey
+        params.put(SpeechConstant.SECRET, AuthUtil.getSk()); // 添加secretKey
+//        params.put(SpeechConstant.SAMPLE_RATE, 8000);
+//        params.put(SpeechConstant.BDS_ASR_ENABLE_LONG_SPEECH , true);
         //  集成时不需要上面的代码，只需要params参数。
         return params;
     }
@@ -171,8 +178,6 @@ public abstract class ActivityUiRecog extends ActivityCommon implements IStatus 
         switch (msg.what) { // 处理MessageStatusRecogListener中的状态回调
             case STATUS_FINISHED:
                 if (msg.arg2 == 1) {
-
-                    Log.e("lgq","识别结果===uiasr  Recog== "+msg.obj.toString());
                     txtResult.setText(msg.obj.toString());
                 }
                 status = msg.what;

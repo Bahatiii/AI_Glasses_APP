@@ -75,8 +75,9 @@ public class MyRecognizer {
         // SDK集成步骤（可选）加载离线命令词(离线时使用)
         asr.send(SpeechConstant.ASR_KWS_LOAD_ENGINE, json, null, 0, 0);
         isOfflineEngineLoaded = true;
-     }
+    }
 
+    private long startTime = 0;
     /**
      * @param params
      */
@@ -87,6 +88,7 @@ public class MyRecognizer {
         // SDK集成步骤 拼接识别参数
         String json = new JSONObject(params).toString();
         MyLogger.info(TAG + ".Debug", "识别参数（反馈请带上此行日志）" + json);
+        startTime = System.currentTimeMillis();
         asr.send(SpeechConstant.ASR_START, json, null, 0, 0);
     }
 

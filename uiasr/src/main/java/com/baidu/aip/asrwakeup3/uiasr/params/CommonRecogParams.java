@@ -49,6 +49,7 @@ public class CommonRecogParams {
                 SpeechConstant.VAD_ENDPOINT_TIMEOUT
         ));
         boolParams.addAll(Arrays.asList(
+                SpeechConstant.BDS_ASR_ENABLE_LONG_SPEECH,
                 SpeechConstant.ACCEPT_AUDIO_DATA,
                 SpeechConstant.ACCEPT_AUDIO_VOLUME
         ));

@@ -1,6 +1,7 @@
 package com.baidu.aip.asrwakeup3.core.mini;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -10,19 +11,27 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import com.baidu.aip.asrwakeup3.core.R;
 
-import com.baidu.aip.asrwakeup3.core.inputstream.InFileStream;
+import com.baidu.aip.asrwakeup3.core.R;
+import com.baidu.aip.asrwakeup3.core.util.AuthUtil;
 import com.baidu.speech.EventListener;
 import com.baidu.speech.EventManager;
 import com.baidu.speech.EventManagerFactory;
 import com.baidu.speech.asr.SpeechConstant;
+import com.baidu.speech.audio.utils.AudioProcessingUtils;
 
 import org.json.JSONObject;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -49,7 +58,7 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
 
     private boolean logTime = true;
 
-    protected boolean enableOffline = false; // 测试离线命令词，需要改成true
+    protected boolean enableOffline = true; // 测试离线命令词，需要改成true
 
     /**
      * 基于SDK集成2.2 发送开始事件
@@ -58,7 +67,11 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
      */
     private void start() {
         txtLog.setText("");
-        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        Map<String, Object> params = AuthUtil.getParam();
+//        params.put(SpeechConstant.PID, 15376);
+//        params.put("user:", 15376);
+//        params.put(SpeechConstant.IN_FILE, getFilesDir() + "/8k.pcm");
+//        params.put(SpeechConstant.SAMPLE_RATE, 8000);
         String event = null;
         event = SpeechConstant.ASR_START; // 替换成测试的event
 
@@ -67,23 +80,38 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
         }
         // 基于SDK集成2.1 设置识别参数
         params.put(SpeechConstant.ACCEPT_AUDIO_VOLUME, false);
+//        params.put(SpeechConstant.VAD_ENDPOINT_TIMEOUT, 60000);
+
+
+//        if (!AudioProcessingUtils.convertWavTo16kPcm(getFilesDir() + "/8k.wav" , getFilesDir() + "/16k.pcm" , 8000)){
+//            return;
+//        }
+//
+//        params.put(SpeechConstant.IN_FILE, getFilesDir() + "/16k.pcm");
+
+
+//        params.put(SpeechConstant.SAMPLE_RATE, 16000);
         // params.put(SpeechConstant.NLU, "enable");
+        // params.put(SpeechConstant.BDS_ASR_ENABLE_LONG_SPEECH, true);//长语音  优先级高于VAD_ENDPOINT_TIMEOUT
         // params.put(SpeechConstant.VAD_ENDPOINT_TIMEOUT, 0); // 长语音
 
-        // params.put(SpeechConstant.IN_FILE, "res:///com/baidu/android/voicedemo/16k_test.pcm");
+//         params.put(SpeechConstant.IN_FILE, getFilesDir() + "/test.pcm");
+//        params.put(SpeechConstant.PID, 15375); // 添加secretKey
         // params.put(SpeechConstant.VAD, SpeechConstant.VAD_DNN);
         // params.put(SpeechConstant.PID, 1537); // 中文输入法模型，有逗号
 
         /* 语音自训练平台特有参数 */
         // params.put(SpeechConstant.PID, 8002);
         // 语音自训练平台特殊pid，8002：模型类似开放平台 1537  具体是8001还是8002，看自训练平台页面上的显示
-        // params.put(SpeechConstant.LMID,1068); // 语音自训练平台已上线的模型ID，https://ai.baidu.com/smartasr/model
+        // params.put(SpeechConstant.LMID,1068);
+        // 语音自训练平台已上线的模型ID，https://ai.baidu.com/smartasr/model
         // 注意模型ID必须在你的appId所在的百度账号下
         /* 语音自训练平台特有参数 */
 
         /* 测试InputStream*/
         // InFileStream.setContext(this);
-        // params.put(SpeechConstant.IN_FILE, "#com.baidu.aip.asrwakeup3.core.inputstream.InFileStream.createMyPipedInputStream()");
+        // params.put(SpeechConstant.IN_FILE,
+        // "#com.baidu.aip.asrwakeup3.core.inputstream.InFileStream.createMyPipedInputStream()");
 
         // 请先使用如‘在线识别’界面测试和生成识别参数。 params同ActivityRecog类中myRecognizer.start(params);
         // 复制此段可以自动检测错误
@@ -185,6 +213,27 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
         asr.unregisterListener(this);
     }
 
+    protected void save(String value, String path) {
+        try {
+            File file = new File(path);
+            if (!file.exists()) {
+                file.createNewFile(); // 创建新文件,有同名的文件的话直接覆盖
+            }
+            FileOutputStream fos = new FileOutputStream(file, true);
+            OutputStreamWriter osw = new OutputStreamWriter(fos);
+            BufferedWriter bw = new BufferedWriter(osw);
+            bw.write(value);
+            bw.newLine();
+            bw.flush();
+            bw.close();
+            osw.close();
+            fos.close();
+        } catch (FileNotFoundException e1) {
+            e1.printStackTrace();
+        } catch (IOException e2) {
+            e2.printStackTrace();
+        }
+    }
     // 基于sdk集成1.2 自定义输出事件类 EventListener 回调方法
     // 基于SDK集成3.1 开始回调事件
     @Override
@@ -204,9 +253,13 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
             } else if (params.contains("\"partial_result\"")) {
                 // 一句话的临时识别结果
                 logTxt += ", 临时识别结果：" + params;
+                save( logTxt += ", 临时识别结果：" + params,
+                        getFilesDir() + "/test.txt");
             }  else if (params.contains("\"final_result\""))  {
                 // 一句话的最终识别结果
                 logTxt += ", 最终识别结果：" + params;
+                save(logTxt += ", 最终识别结果：" + params,
+                        getFilesDir() + "/test.txt");
             }  else {
                 // 一般这里不会运行
                 logTxt += " ;params :" + params;
@@ -238,6 +291,7 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
     }
 
 
+    @SuppressLint("SetTextI18n")
     private void initView() {
         txtResult = (TextView) findViewById(R.id.txtResult);
         txtLog = (TextView) findViewById(R.id.txtLog);
@@ -273,7 +327,7 @@ public class ActivityMiniRecog extends AppCompatActivity implements EventListene
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         // 此处为android 6.0以上动态授权的回调，用户自行实现。
     }
 

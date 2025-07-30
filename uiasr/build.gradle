@@ -1,17 +1,15 @@
-plugins {
-    id 'com.android.library'
-}
+apply plugin: 'com.android.library'
 
 android {
-    namespace "com.baidu.aip.asrwakeup3.uiasr"   // <---- 新增命名空间
-
-    compileSdkVersion 33   // 建议升级，28 已经很旧了
-
+    namespace "com.baidu.aip.asrwakeup3.uiasr"
+    compileSdkVersion 36
     defaultConfig {
-        minSdkVersion 16
-        targetSdkVersion 33
+        minSdkVersion 24
+        targetSdkVersion 36
         versionCode 1
         versionName "1.0"
+
+
     }
 
     buildTypes {
@@ -20,10 +18,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'androidx.appcompat:appcompat:1.6.1'  // 建议升级
+    implementation 'androidx.appcompat:appcompat:1.0.2'
     implementation project(':core')
 }

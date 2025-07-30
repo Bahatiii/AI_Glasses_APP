@@ -16,13 +16,13 @@ public class BluetoothReceiver extends BroadcastReceiver {
                     intent.getIntExtra(
                             BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_DISCONNECTED);
             if (state == BluetoothHeadset.STATE_CONNECTED) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset connected");
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset connected");
                 AndroidAudioManager.getInstance(context).bluetoothHeadetConnectionChanged(true);
             } else if (state == BluetoothHeadset.STATE_DISCONNECTED) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset disconnected");
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset disconnected");
                 AndroidAudioManager.getInstance(context).bluetoothHeadetConnectionChanged(false);
             } else {
-                Log.w("BluetoothReceiver","[Bluetooth] Bluetooth headset unknown state changed: " + state);
+                Log.w("BluetoothReceiver", "[Bluetooth] Bluetooth headset unknown state changed: " + state);
             }
         } else if (action.equals(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)) {
             int state =
@@ -30,13 +30,13 @@ public class BluetoothReceiver extends BroadcastReceiver {
                             BluetoothHeadset.EXTRA_STATE,
                             BluetoothHeadset.STATE_AUDIO_DISCONNECTED);
             if (state == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset audio connected");
-                //AndroidAudioManager.getInstance(context).bluetoothHeadetAudioConnectionChanged(true);
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset audio connected");
+                // AndroidAudioManager.getInstance(context).bluetoothHeadetAudioConnectionChanged(true);
             } else if (state == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset audio disconnected");
-                //AndroidAudioManager.getInstance(context).bluetoothHeadetAudioConnectionChanged(false);
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset audio disconnected");
+                // AndroidAudioManager.getInstance(context).bluetoothHeadetAudioConnectionChanged(false);
             } else {
-                Log.w("BluetoothReceiver","[Bluetooth] Bluetooth headset unknown audio state changed: " + state);
+                Log.w("BluetoothReceiver", "[Bluetooth] Bluetooth headset unknown audio state changed: " + state);
             }
         } else if (action.equals(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)) {
             int state =
@@ -44,17 +44,17 @@ public class BluetoothReceiver extends BroadcastReceiver {
                             AudioManager.EXTRA_SCO_AUDIO_STATE,
                             AudioManager.SCO_AUDIO_STATE_DISCONNECTED);
             if (state == AudioManager.SCO_AUDIO_STATE_CONNECTED) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset SCO connected");
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset SCO connected");
                 AndroidAudioManager.getInstance(context).bluetoothHeadetScoConnectionChanged(true);
             } else if (state == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset SCO disconnected");
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset SCO disconnected");
                 AndroidAudioManager.getInstance(context).bluetoothHeadetScoConnectionChanged(false);
             } else if (state == AudioManager.SCO_AUDIO_STATE_CONNECTING) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset SCO connecting");
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset SCO connecting");
             } else if (state == AudioManager.SCO_AUDIO_STATE_ERROR) {
-                Log.i("BluetoothReceiver","[Bluetooth] Bluetooth headset SCO connection error");
+                Log.i("BluetoothReceiver", "[Bluetooth] Bluetooth headset SCO connection error");
             } else {
-                Log.w("BluetoothReceiver","[Bluetooth] Bluetooth headset unknown SCO state changed: " + state);
+                Log.w("BluetoothReceiver", "[Bluetooth] Bluetooth headset unknown SCO state changed: " + state);
             }
         } else if (action.equals(BluetoothHeadset.ACTION_VENDOR_SPECIFIC_HEADSET_EVENT)) {
             String command =
@@ -84,9 +84,9 @@ public class BluetoothReceiver extends BroadcastReceiver {
                     commandType = "AT Unknown";
                     break;
             }
-            Log.i("BluetoothReceiver","[Bluetooth] Vendor action " + commandType + " : " + command);
+            Log.i("BluetoothReceiver", "[Bluetooth] Vendor action " + commandType + " : " + command);
         } else {
-            Log.w("BluetoothReceiver","[Bluetooth] Bluetooth unknown action: " + action);
+            Log.w("BluetoothReceiver", "[Bluetooth] Bluetooth unknown action: " + action);
         }
     }
 }

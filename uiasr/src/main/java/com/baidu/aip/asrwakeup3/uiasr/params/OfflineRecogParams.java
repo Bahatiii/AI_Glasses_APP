@@ -2,6 +2,7 @@ package com.baidu.aip.asrwakeup3.uiasr.params;
 
 import android.content.SharedPreferences;
 
+import com.baidu.aip.asrwakeup3.core.util.AuthUtil;
 import com.baidu.speech.asr.SpeechConstant;
 
 import org.json.JSONArray;
@@ -31,7 +32,7 @@ public class OfflineRecogParams extends CommonRecogParams {
     }
 
     public static Map<String, Object> fetchOfflineParams() {
-        Map<String, Object> map = new HashMap<String, Object>();
+        Map<String, Object> map = AuthUtil.getParam();
         map.put(SpeechConstant.DECODER, 2);
         map.put(SpeechConstant.ASR_OFFLINE_ENGINE_GRAMMER_FILE_PATH, "assets:///baidu_speech_grammar.bsg");
         map.putAll(fetchSlotDataParam());

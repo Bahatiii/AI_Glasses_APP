@@ -26,8 +26,15 @@
             android:name="com.amap.api.v2.apikey"
             android:value="e36a22d0ea178958eacd6ca3c2b8ca68" />
         <meta-data
-            android:name="IFLYTEK_APPID"
-            android:value="8591e1f6" />
+            android:name="com.baidu.speech.APP_ID"
+            android:value="119639331"/>
+        <meta-data
+            android:name="com.baidu.speech.API_KEY"
+            android:value="m7ASQMZdl2HFJ749azmDpUCl"/>
+        <meta-data
+            android:name="com.baidu.speech.SECRET_KEY"
+            android:value="9JlgF4o4WNuhqxpIRDAVzcqFDe97GAu1"/>
+
         <activity
             android:name=".VideoActivity"
             android:exported="false"

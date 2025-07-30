@@ -13,8 +13,6 @@ import com.baidu.speech.asr.SpeechConstant;
 public class MessageStatusRecogListener extends StatusRecogListener {
     private Handler handler;
 
-    private OnChangeLisener onChangeLisener;
-
     private long speechEndTime = 0;
 
     private boolean needTime = true;
@@ -56,9 +54,7 @@ public class MessageStatusRecogListener extends StatusRecogListener {
     @Override
     public void onAsrFinalResult(String[] results, RecogResult recogResult) {
         super.onAsrFinalResult(results, recogResult);
-        Log.e("lgq","结果是===core MessageListerner==== "+results[0] );
         String message = "识别结束，结果是”" + results[0] + "”";
-        onChangeLisener.onChanged(results[0]);
         sendStatusMessage(SpeechConstant.CALLBACK_EVENT_ASR_PARTIAL,
                 message + "；原始json：" + recogResult.getOrigalJson());
         if (speechEndTime > 0) {
@@ -69,11 +65,6 @@ public class MessageStatusRecogListener extends StatusRecogListener {
         }
         speechEndTime = 0;
         sendMessage(message, status, true);
-    }
-
-    //设置选择回调
-    public void setOnChangeLisener(OnChangeLisener onChangeLisener) {
-        this.onChangeLisener = onChangeLisener;
     }
 
     @Override

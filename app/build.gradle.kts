@@ -36,13 +36,14 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
+    implementation(project(":core"))
+    implementation(project(":uiasr"))
+    implementation(libs.play.services.drive)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
     implementation(
         files("libs/AMap3DMap_10.1.201_AMapNavi_10.1.201_AMapSearch_9.7.4_AMapLocation_6.4.9_20250326.aar")
     )
-    implementation(project(":core"))
-    implementation(project(":uiasr"))
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.18.0")
 }

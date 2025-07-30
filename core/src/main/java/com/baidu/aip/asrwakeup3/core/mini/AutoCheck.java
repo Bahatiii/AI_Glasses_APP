@@ -235,26 +235,16 @@ public class AutoCheck {
         private String secretKey;
 
         public AppInfoCheck(Context context, Map<String, Object> params) throws PackageManager.NameNotFoundException {
-            Bundle metaData = context.getPackageManager().getApplicationInfo(context.getPackageName(),
-                    PackageManager.GET_META_DATA).metaData;
+
             if (params.get(SpeechConstant.APP_ID) != null) {
                 appId = params.get(SpeechConstant.APP_ID).toString();
-            } else {
-                int id = metaData.getInt("com.baidu.speech.APP_ID", 0);
-                if (id > 0) {
-                    appId = "" + id;
-                }
             }
             if (params.get(SpeechConstant.APP_KEY) != null) {
                 appKey = params.get(SpeechConstant.APP_KEY).toString();
-            } else {
-                appKey = metaData.getString("com.baidu.speech.API_KEY", "");
             }
 
             if (params.get(SpeechConstant.SECRET) != null) {
                 secretKey = params.get(SpeechConstant.SECRET).toString();
-            } else {
-                secretKey = metaData.getString("com.baidu.speech.SECRET_KEY", "");
             }
         }
 

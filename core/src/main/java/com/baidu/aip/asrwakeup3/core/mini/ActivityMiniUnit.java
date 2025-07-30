@@ -13,8 +13,9 @@ import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import com.baidu.aip.asrwakeup3.core.R;
 
+import com.baidu.aip.asrwakeup3.core.R;
+import com.baidu.aip.asrwakeup3.core.util.AuthUtil;
 import com.baidu.speech.EventListener;
 import com.baidu.speech.EventManager;
 import com.baidu.speech.EventManagerFactory;
@@ -60,7 +61,7 @@ public class ActivityMiniUnit extends AppCompatActivity implements EventListener
      */
     private void start() {
         txtLog.setText("");
-        Map<String, Object> params = new LinkedHashMap<String, Object>();
+        Map<String, Object> params = AuthUtil.getParam();
         String event = null;
         event = SpeechConstant.ASR_START; // 替换成测试的event
 

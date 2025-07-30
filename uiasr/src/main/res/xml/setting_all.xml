@@ -36,6 +36,11 @@
             android:summary=""
             android:defaultValue="@string/vad_default"
             android:dialogTitle="VAD"/>
+        <CheckBoxPreference
+            android:key="enable.long.speech"
+            android:defaultValue="false"
+            android:summary="长语音参数，优先级高于vad_endpoint_timeout"
+            android:title="长语音" />
         <ListPreference
             android:key="vad.endpoint-timeout"
             android:defaultValue="@string/vad_timeout_default"

@@ -4,86 +4,65 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Message;
-import android.preference.PreferenceManager;
-import android.util.Log;
-import android.widget.FrameLayout;
-import android.widget.Toast;
-import android.widget.EditText;
-import android.widget.ListView;
+import android.view.MotionEvent;
 import android.widget.ArrayAdapter;
-import android.text.TextWatcher;
-import android.text.Editable;
-import android.view.View;
+import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
+import android.widget.ListView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.amap.api.location.AMapLocation;
 import com.amap.api.location.AMapLocationClient;
 import com.amap.api.location.AMapLocationClientOption;
-import com.amap.api.location.AMapLocationListener;
 import com.amap.api.maps.MapsInitializer;
 import com.amap.api.navi.AMapNavi;
 import com.amap.api.navi.AMapNaviListener;
 import com.amap.api.navi.AMapNaviView;
 import com.amap.api.navi.enums.NaviType;
 import com.amap.api.navi.model.AMapCalcRouteResult;
-import com.amap.api.navi.model.AMapLaneInfo;
-import com.amap.api.navi.model.AMapModelCross;
-import com.amap.api.navi.model.AMapNaviCameraInfo;
-import com.amap.api.navi.model.AMapNaviCross;
-import com.amap.api.navi.model.AMapNaviLocation;
 import com.amap.api.navi.model.AMapNaviRouteNotifyData;
-import com.amap.api.navi.model.AMapNaviTrafficFacilityInfo;
-import com.amap.api.navi.model.AMapServiceAreaInfo;
-import com.amap.api.navi.model.AimLessModeCongestionInfo;
-import com.amap.api.navi.model.AimLessModeStat;
 import com.amap.api.navi.model.NaviInfo;
 import com.amap.api.navi.model.NaviLatLng;
 import com.amap.api.services.help.Inputtips;
 import com.amap.api.services.help.InputtipsQuery;
 import com.amap.api.services.help.Tip;
-import com.amap.api.services.geocoder.GeocodeSearch;
-import com.amap.api.services.geocoder.GeocodeQuery;
-import com.amap.api.services.geocoder.GeocodeAddress;
-import com.amap.api.services.geocoder.GeocodeResult;
-
+import com.autonavi.ae.route.InitConfig;
 import com.baidu.aip.asrwakeup3.core.recog.MyRecognizer;
 import com.baidu.aip.asrwakeup3.core.recog.listener.MessageStatusRecogListener;
-import com.baidu.aip.asrwakeup3.core.recog.listener.OnChangeLisener;
+import com.baidu.aip.asrwakeup3.core.recog.RecogResult;
 import com.baidu.aip.asrwakeup3.uiasr.params.OnlineRecogParams;
+import com.baidu.speech.asr.SpeechConstant;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class NavigationActivity extends AppCompatActivity implements AMapNaviListener {
-
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
-
-    // 高德地图导航
-    private AMapLocationClient locationClient;
-    private AMapNavi mAMapNavi;
-    private AMapNaviView mAMapNaviView;
-    private NaviLatLng mStartLatLng;
-    private NaviLatLng mEndLatLng = new NaviLatLng(23.00523804, 113.374652);
-
-    // 搜索栏
     private EditText etSearch;
     private ListView lvTips;
     private ArrayAdapter<String> tipsAdapter;
     private List<Tip> tipList = new ArrayList<>();
+    private ImageButton btnVoice;
+    private AMapLocationClient locationClient;
+    private AMapNavi mAMapNavi;
+    private AMapNaviView mAMapNaviView;
 
-    // 语音识别
+    private NaviLatLng mStartLatLng;
+    private NaviLatLng mEndLatLng;
+
+    // 百度语音
     private MyRecognizer myRecognizer;
     private OnlineRecogParams apiParams;
-    private Handler handler;
-    private OnChangeLisener onChangeLisener;
-    private ImageButton btnVoice;
+    private MessageStatusRecogListener recogListener;
+    private Map<String, Object> recogParams;
+    private boolean isListening = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -93,12 +72,17 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         MapsInitializer.updatePrivacyAgree(this, true);
         setContentView(R.layout.activity_navigation);
 
-        // 权限检查
+        etSearch = findViewById(R.id.et_search);
+        lvTips = findViewById(R.id.lv_tips);
+        btnVoice = findViewById(R.id.btn_voice);
+
+        tipsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
+        lvTips.setAdapter(tipsAdapter);
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED ||
                 ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
                         != PackageManager.PERMISSION_GRANTED) {
-
             ActivityCompat.requestPermissions(this,
                     new String[]{
                             Manifest.permission.ACCESS_FINE_LOCATION,
@@ -109,18 +93,14 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                     LOCATION_PERMISSION_REQUEST_CODE);
         } else {
             initNavi(savedInstanceState);
-            initBaiduVoice();
+            initSpeechRecognizer();
             startLocation();
         }
 
-        // 搜索栏初始化
-        etSearch = findViewById(R.id.et_search);
-        lvTips = findViewById(R.id.lv_tips);
-        tipsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
-        lvTips.setAdapter(tipsAdapter);
-
-        etSearch.addTextChangedListener(new TextWatcher() {
+        // 输入提示
+        etSearch.addTextChangedListener(new android.text.TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            @Override public void afterTextChanged(android.text.Editable s) {}
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 if (s.length() > 0) {
@@ -136,62 +116,124 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                             tipsAdapter.clear();
                             tipsAdapter.addAll(names);
                             tipsAdapter.notifyDataSetChanged();
-                            lvTips.setVisibility(View.VISIBLE);
+                            lvTips.setVisibility(android.view.View.VISIBLE);
                         } else {
-                            lvTips.setVisibility(View.GONE);
+                            lvTips.setVisibility(android.view.View.GONE);
                         }
                     });
                     inputTips.requestInputtipsAsyn();
                 } else {
-                    lvTips.setVisibility(View.GONE);
+                    lvTips.setVisibility(android.view.View.GONE);
                 }
             }
-            @Override public void afterTextChanged(Editable s) {}
         });
 
         lvTips.setOnItemClickListener((parent, view, position, id) -> {
             Tip tip = tipList.get(position);
             etSearch.setText(tip.getName());
-            lvTips.setVisibility(View.GONE);
-
+            lvTips.setVisibility(android.view.View.GONE);
             if (tip.getPoint() != null) {
                 mEndLatLng = new NaviLatLng(tip.getPoint().getLatitude(), tip.getPoint().getLongitude());
                 Toast.makeText(this, "已选终点: " + tip.getName(), Toast.LENGTH_SHORT).show();
                 startWalkNavigation();
             } else {
-                try {
-                    GeocodeSearch geocodeSearch = new GeocodeSearch(this);
-                    geocodeSearch.setOnGeocodeSearchListener(new GeocodeSearch.OnGeocodeSearchListener() {
-                        @Override
-                        public void onGeocodeSearched(GeocodeResult result, int rCode) {
-                            if (rCode == 1000 && result != null && result.getGeocodeAddressList().size() > 0) {
-                                GeocodeAddress address = result.getGeocodeAddressList().get(0);
-                                mEndLatLng = new NaviLatLng(address.getLatLonPoint().getLatitude(), address.getLatLonPoint().getLongitude());
-                                Toast.makeText(NavigationActivity.this, "已选终点: " + tip.getName(), Toast.LENGTH_SHORT).show();
-                                startWalkNavigation();
-                            } else {
-                                Toast.makeText(NavigationActivity.this, "未找到终点坐标", Toast.LENGTH_SHORT).show();
-                            }
-                        }
-                        @Override public void onRegeocodeSearched(com.amap.api.services.geocoder.RegeocodeResult regeocodeResult, int i) {}
-                    });
-                    geocodeSearch.getFromLocationNameAsyn(new GeocodeQuery(tip.getName(), ""));
-                } catch (com.amap.api.services.core.AMapException e) {
-                    e.printStackTrace();
-                    Toast.makeText(NavigationActivity.this, "地理编码初始化失败", Toast.LENGTH_SHORT).show();
-                }
+                Toast.makeText(this, "该地点暂无坐标", Toast.LENGTH_SHORT).show();
             }
         });
 
-        // 语音按钮
-        btnVoice = findViewById(R.id.btn_voice);
-        btnVoice.setOnClickListener(v -> startVoiceRecognize());
+        // 语音按钮触摸事件
+        btnVoice.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    Toast.makeText(this, "开始语音输入", Toast.LENGTH_SHORT).show();
+                    startListening();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    Toast.makeText(this, "停止语音输入", Toast.LENGTH_SHORT).show();
+                    stopListening();
+                    return true;
+            }
+            return false;
+        });
+    }
+
+    /** 初始化语音识别 */
+    private void initSpeechRecognizer() {
+        recogParams = new HashMap<>();
+        recogParams.put(com.baidu.speech.asr.SpeechConstant.VAD, com.baidu.speech.asr.SpeechConstant.VAD_TOUCH);
+        recogParams.put(com.baidu.speech.asr.SpeechConstant.DECODER, 0);
+        recogParams.put(com.baidu.speech.asr.SpeechConstant.PID, 1537);
+
+        Handler handler = new Handler((msg) -> true);
+
+        recogListener = new MessageStatusRecogListener(handler) {
+            @Override
+            public void onAsrPartialResult(String[] results, RecogResult recogResult) {
+                if (results != null && results.length > 0) {
+                    String text = results[0];
+                    runOnUiThread(() -> {
+                        etSearch.setText(text);
+                        etSearch.setSelection(text.length());
+                    });
+                }
+            }
+
+            @Override
+            public void onAsrFinalResult(String[] results, RecogResult recogResult) {
+                if (results != null && results.length > 0) {
+                    String text = results[0];
+                    runOnUiThread(() -> {
+                        etSearch.setText(text);
+                        etSearch.setSelection(text.length());
+                        searchByKeyword(text);
+                    });
+                }
+            }
+        };
+        myRecognizer = new MyRecognizer(this, recogListener);
+    }
+
+    private void startListening() {
+        if (!isListening) {
+            isListening = true;
+            myRecognizer.start(recogParams);
+        }
+    }
+
+    private void stopListening() {
+        if (isListening) {
+            isListening = false;
+            myRecognizer.stop();
+        }
+    }
+
+    private void searchByKeyword(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) return;
+        InputtipsQuery query = new InputtipsQuery(keyword, "");
+        Inputtips inputTips = new Inputtips(this, query);
+        inputTips.setInputtipsListener((list, rCode) -> {
+            if (rCode == 1000 && list != null) {
+                tipList = list;
+                List<String> names = new ArrayList<>();
+                for (Tip tip : list) {
+                    names.add(tip.getName());
+                }
+                tipsAdapter.clear();
+                tipsAdapter.addAll(names);
+                tipsAdapter.notifyDataSetChanged();
+                lvTips.setVisibility(android.view.View.VISIBLE);
+            } else {
+                lvTips.setVisibility(android.view.View.GONE);
+            }
+        });
+        inputTips.requestInputtipsAsyn();
     }
 
     private void initNavi(Bundle savedInstanceState) {
         mAMapNaviView = new AMapNaviView(this);
         mAMapNaviView.onCreate(savedInstanceState);
-        FrameLayout container = findViewById(R.id.navi_container);
+        FrameLayout container = (FrameLayout) findViewById(R.id.navi_container);
         container.addView(mAMapNaviView);
 
         try {
@@ -199,10 +241,9 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         } catch (Exception e) {
             e.printStackTrace();
             Toast.makeText(this, "导航初始化失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
-            return;
         }
+
         mAMapNavi.addAMapNaviListener(this);
-        mAMapNavi.setUseInnerVoice(true);
     }
 
     private void startLocation() {
@@ -212,16 +253,11 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             option.setOnceLocation(true);
             option.setLocationMode(AMapLocationClientOption.AMapLocationMode.Hight_Accuracy);
             locationClient.setLocationOption(option);
-            locationClient.setLocationListener(new AMapLocationListener() {
-                @Override
-                public void onLocationChanged(AMapLocation location) {
-                    if (location != null && location.getErrorCode() == 0) {
-                        mStartLatLng = new NaviLatLng(location.getLatitude(), location.getLongitude());
-                    } else {
-                        Toast.makeText(getApplicationContext(),
-                                "定位失败：" + (location != null ? location.getErrorInfo() : "null"),
-                                Toast.LENGTH_LONG).show();
-                    }
+            locationClient.setLocationListener(location -> {
+                if (location != null && location.getErrorCode() == 0) {
+                    mStartLatLng = new NaviLatLng(location.getLatitude(), location.getLongitude());
+                } else {
+                    Toast.makeText(this, "定位失败", Toast.LENGTH_SHORT).show();
                 }
             });
             locationClient.startLocation();
@@ -235,45 +271,18 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             Toast.makeText(this, "起点或终点为空", Toast.LENGTH_SHORT).show();
             return;
         }
-        boolean result = mAMapNavi.calculateWalkRoute(mStartLatLng, mEndLatLng);
-        if (!result) Toast.makeText(this, "路径规划失败", Toast.LENGTH_SHORT).show();
+        if (!mAMapNavi.calculateWalkRoute(mStartLatLng, mEndLatLng)) {
+            Toast.makeText(this, "路径规划失败", Toast.LENGTH_SHORT).show();
+        }
     }
 
-    /** 百度语音识别初始化 */
-    private void initBaiduVoice() {
-        apiParams = new OnlineRecogParams();
-        handler = new Handler((Message msg) -> true);
-
-        onChangeLisener = text -> {
-            Log.i("语音识别结果", text);
-            runOnUiThread(() -> {
-                etSearch.setText(text);
-                etSearch.setSelection(text.length());
-            });
-        };
-
-        MessageStatusRecogListener listener = new MessageStatusRecogListener(handler);
-        listener.setOnChangeLisener(onChangeLisener);
-        myRecognizer = new MyRecognizer(this, listener);
-    }
-
-    private void startVoiceRecognize() {
-        Map<String, Object> params = apiParams.fetch(
-                PreferenceManager.getDefaultSharedPreferences(this)
-        );
-        myRecognizer.start(params);
-    }
-
-    private void stopVoiceRecognize() {
-        if (myRecognizer != null) myRecognizer.stop();
-    }
-
-    @Override protected void onPause() { super.onPause(); stopVoiceRecognize(); }
+    @Override protected void onResume() {super.onResume();if (mAMapNaviView != null) mAMapNaviView.onResume();}
+    @Override protected void onPause() {super.onPause();if (mAMapNaviView != null) mAMapNaviView.onPause();}
     @Override protected void onDestroy() {
         super.onDestroy();
-        if (mAMapNavi != null) { mAMapNavi.stopNavi(); mAMapNavi.destroy(); }
+        if (mAMapNavi != null) {mAMapNavi.stopNavi();mAMapNavi.destroy();}
         if (mAMapNaviView != null) mAMapNaviView.onDestroy();
-        if (locationClient != null) { locationClient.stopLocation(); locationClient.onDestroy(); }
+        if (locationClient != null) {locationClient.stopLocation();locationClient.onDestroy();}
         if (myRecognizer != null) myRecognizer.release();
     }
 
@@ -281,19 +290,26 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            boolean granted = true;
-            for (int r : grantResults) if (r != PackageManager.PERMISSION_GRANTED) granted = false;
-            if (granted) { initNavi(null); initBaiduVoice(); startLocation(); }
-            else Toast.makeText(this, "权限被拒绝，无法使用导航和语音识别", Toast.LENGTH_LONG).show();
+            boolean allGranted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {allGranted = false;break;}
+            }
+            if (allGranted) {
+                initNavi(null);
+                initSpeechRecognizer();
+                startLocation();
+            } else {
+                Toast.makeText(this, "需要全部权限以开始导航", Toast.LENGTH_SHORT).show();
+            }
         }
     }
 
-    // ---------------- AMapNaviListener ------------
+    // ------------ AMapNaviListener ------------
     @Override public void onInitNaviFailure() {}
     @Override public void onInitNaviSuccess() {}
     @Override public void onStartNavi(int i) {}
     @Override public void onTrafficStatusUpdate() {}
-    @Override public void onLocationChange(AMapNaviLocation aMapNaviLocation) {}
+    @Override public void onLocationChange(com.amap.api.navi.model.AMapNaviLocation aMapNaviLocation) {}
     @Override public void onGetNavigationText(int i, String s) {}
     @Override public void onGetNavigationText(String s) {}
     @Override public void onEndEmulatorNavi() {}
@@ -304,25 +320,27 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     @Override public void onArrivedWayPoint(int i) {}
     @Override public void onGpsOpenStatus(boolean b) {}
     @Override public void onNaviInfoUpdate(NaviInfo naviInfo) {}
-    @Override public void updateCameraInfo(AMapNaviCameraInfo[] infos) {}
-    @Override public void updateIntervalCameraInfo(AMapNaviCameraInfo a, AMapNaviCameraInfo b, int i) {}
-    @Override public void onServiceAreaUpdate(AMapServiceAreaInfo[] infos) {}
-    @Override public void showCross(AMapNaviCross cross) {}
+    @Override public void updateCameraInfo(com.amap.api.navi.model.AMapNaviCameraInfo[] infos) {}
+    @Override public void updateIntervalCameraInfo(com.amap.api.navi.model.AMapNaviCameraInfo info, com.amap.api.navi.model.AMapNaviCameraInfo info1, int i) {}
+    @Override public void onServiceAreaUpdate(com.amap.api.navi.model.AMapServiceAreaInfo[] infos) {}
+    @Override public void showCross(com.amap.api.navi.model.AMapNaviCross cross) {}
     @Override public void hideCross() {}
-    @Override public void showModeCross(AMapModelCross cross) {}
+    @Override public void showModeCross(com.amap.api.navi.model.AMapModelCross modelCross) {}
     @Override public void hideModeCross() {}
-    @Override public void showLaneInfo(AMapLaneInfo[] infos, byte[] bytes, byte[] bytes1) {}
-    @Override public void showLaneInfo(AMapLaneInfo info) {}
+    @Override public void showLaneInfo(com.amap.api.navi.model.AMapLaneInfo[] infos, byte[] bytes, byte[] bytes1) {}
+    @Override public void showLaneInfo(com.amap.api.navi.model.AMapLaneInfo info) {}
     @Override public void hideLaneInfo() {}
     @Override public void onCalculateRouteSuccess(int[] ints) {}
     @Override public void notifyParallelRoad(int i) {}
-    @Override public void OnUpdateTrafficFacility(AMapNaviTrafficFacilityInfo[] infos) {}
-    @Override public void OnUpdateTrafficFacility(AMapNaviTrafficFacilityInfo info) {}
-    @Override public void updateAimlessModeStatistics(AimLessModeStat stat) {}
-    @Override public void updateAimlessModeCongestionInfo(AimLessModeCongestionInfo info) {}
+    @Override public void OnUpdateTrafficFacility(com.amap.api.navi.model.AMapNaviTrafficFacilityInfo[] infos) {}
+    @Override public void OnUpdateTrafficFacility(com.amap.api.navi.model.AMapNaviTrafficFacilityInfo info) {}
+    @Override public void updateAimlessModeStatistics(com.amap.api.navi.model.AimLessModeStat stat) {}
+    @Override public void updateAimlessModeCongestionInfo(com.amap.api.navi.model.AimLessModeCongestionInfo info) {}
     @Override public void onPlayRing(int i) {}
-    @Override public void onCalculateRouteSuccess(AMapCalcRouteResult result) { mAMapNavi.startNavi(NaviType.GPS); }
-    @Override public void onCalculateRouteFailure(AMapCalcRouteResult result) { Toast.makeText(this, "路径规划失败：" + result.getErrorCode(), Toast.LENGTH_LONG).show(); }
+    @Override public void onCalculateRouteSuccess(AMapCalcRouteResult result) {mAMapNavi.startNavi(NaviType.GPS);}
+    @Override public void onCalculateRouteFailure(AMapCalcRouteResult result) {
+        Toast.makeText(this, "路径规划失败，错误码：" + result.getErrorCode(), Toast.LENGTH_LONG).show();
+    }
     @Override public void onNaviRouteNotify(AMapNaviRouteNotifyData data) {}
     @Override public void onGpsSignalWeak(boolean b) {}
 }

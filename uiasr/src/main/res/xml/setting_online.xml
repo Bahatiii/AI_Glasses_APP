@@ -21,15 +21,20 @@
                 android:dialogTitle="自训练平台ID"/>
     </PreferenceCategory>
     <PreferenceCategory
-            android:title="长语音及VAD时长设置">
+        android:title="长语音及VAD时长设置">
+        <CheckBoxPreference
+            android:key="enable.long.speech"
+            android:defaultValue="false"
+            android:summary="长语音参数，优先级高于vad_endpoint_timeout"
+            android:title="长语音" />
         <ListPreference
-                android:key="vad.endpoint-timeout"
-                android:entries="@array/vad_timeout_list"
-                android:entryValues="@array/vad_timeout_list"
-                android:title="长语音及VAD时长设置"
-                android:summary=""
-                android:defaultValue="@string/vad_timeout_default"
-                android:dialogTitle="长语音请选0, VAD_ENDPOINT_TIMEOUT"/>
+            android:key="vad.endpoint-timeout"
+            android:entries="@array/vad_timeout_list"
+            android:entryValues="@array/vad_timeout_list"
+            android:title="VAD时长设置"
+            android:summary=""
+            android:defaultValue="@string/vad_timeout_default"
+            android:dialogTitle="长语音请选0, VAD_ENDPOINT_TIMEOUT"/>
     </PreferenceCategory>
     <PreferenceCategory
             android:title="高级设置">

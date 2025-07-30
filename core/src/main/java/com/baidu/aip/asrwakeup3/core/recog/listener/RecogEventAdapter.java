@@ -49,6 +49,7 @@ public class RecogEventAdapter implements EventListener {
             listener.onAsrEnd();
 
         } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_PARTIAL)) {
+            Log.e("TTS_TEST" , "收到消息" + System.currentTimeMillis());
             RecogResult recogResult = RecogResult.parseJson(params);
             // 识别结果
             String[] results = recogResult.getResultsRecognition();
@@ -60,7 +61,8 @@ public class RecogEventAdapter implements EventListener {
                 listener.onAsrPartialResult(results, recogResult);
             } else if (recogResult.isNluResult()) {
                 // 语义理解结果
-                listener.onAsrOnlineNluResult(new String(data, offset, length));
+                String a = new String(data, offset, length);
+                listener.onAsrOnlineNluResult(a);
             }
 
         } else if (name.equals(SpeechConstant.CALLBACK_EVENT_ASR_FINISH)) {

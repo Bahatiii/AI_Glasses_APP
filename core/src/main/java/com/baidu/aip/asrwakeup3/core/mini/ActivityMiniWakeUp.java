@@ -7,13 +7,14 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
-import com.baidu.aip.asrwakeup3.core.R;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.baidu.aip.asrwakeup3.core.R;
 import com.baidu.aip.asrwakeup3.core.inputstream.InFileStream;
+import com.baidu.aip.asrwakeup3.core.util.AuthUtil;
 import com.baidu.speech.EventListener;
 import com.baidu.speech.EventManager;
 import com.baidu.speech.EventManagerFactory;
@@ -22,7 +23,6 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.TreeMap;
 
 /**
  * Created by fujiayi on 2017/8/15.
@@ -51,9 +51,11 @@ public class ActivityMiniWakeUp extends AppCompatActivity implements EventListen
     private void start() {
         txtLog.setText("");
         // 基于SDK唤醒词集成第2.1 设置唤醒的输入参数
-        Map<String, Object> params = new TreeMap<String, Object>();
+        Map<String, Object> params = AuthUtil.getParam();
         params.put(SpeechConstant.ACCEPT_AUDIO_VOLUME, false);
         params.put(SpeechConstant.WP_WORDS_FILE, "assets:///WakeUp.bin");
+        params.put(SpeechConstant.DECODER, 2);
+        params.put(SpeechConstant.ASR_OFFLINE_ENGINE_GRAMMER_FILE_PATH, "assets:///baidu_speech_grammar.bsg");
         // "assets:///WakeUp.bin" 表示WakeUp.bin文件定义在assets目录下
         InFileStream.setContext(this);
         String json = null; // 这里可以替换成你需要测试的json
