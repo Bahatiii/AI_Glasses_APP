@@ -31,9 +31,15 @@ public class AIChatActivity extends AppCompatActivity {
         apiClient = new GLMApiClient();
 
         btnSend.setOnClickListener(v -> {
+            // 隐藏输入法键盘
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.hideSoftInputFromWindow(etInput.getWindowToken(), 0);
+            }
             String userText = etInput.getText().toString().trim();
             if (userText.isEmpty()) return;
             tvChat.append("你: " + userText + "\n");
+            etInput.setText(""); // 自动清空输入框
             btnSend.setEnabled(false);
 
             // 本地处理“导航”或“视频”关键词，不走接口
