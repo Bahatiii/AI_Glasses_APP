@@ -26,6 +26,13 @@
         <meta-data
             android:name="com.amap.api.v2.apikey"
             android:value="e36a22d0ea178958eacd6ca3c2b8ca68" />
+
+        <activity
+            android:name=".AIChatActivity"
+            android:exported="false"
+            android:label="AI模式"
+            android:parentActivityName=".MainActivity" />
+
         <activity
             android:name=".VideoActivity"
             android:exported="false"

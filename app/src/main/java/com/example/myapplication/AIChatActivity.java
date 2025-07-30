@@ -36,9 +36,23 @@ public class AIChatActivity extends AppCompatActivity {
             tvChat.append("你: " + userText + "\n");
             btnSend.setEnabled(false);
 
+            // 本地处理“导航”或“视频”关键词，不走接口
+            if (userText.contains("导航")) {
+                tvChat.append("AI: 我好像听到你提到了导航，要打开导航模式吗？\n");
+                awaitingNavigationConfirm = true;
+                btnSend.setEnabled(true);
+                return;
+            } else if (userText.contains("视频")) {
+                tvChat.append("AI: 我好像听到你提到了视频，要打开视频模式吗？\n");
+                awaitingVideoConfirm = true;
+                btnSend.setEnabled(true);
+                return;
+            }
+
             apiClient.chatCompletion(userText, new Callback() {
                 @Override
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                    e.printStackTrace(); // 打印异常到Logcat
                     runOnUiThread(() -> {
                         tvChat.append("AI: 网络错误\n");
                         btnSend.setEnabled(true);
@@ -49,6 +63,7 @@ public class AIChatActivity extends AppCompatActivity {
                 public void onResponse(@NotNull Call call, @NotNull Response response) {
                     try {
                         String resp = response.body() != null ? response.body().string() : "";
+                        System.out.println("GLM原始响应: " + resp); // 打印到Logcat
                         String content = GLMResponseParser.parseContent(resp);
                         runOnUiThread(() -> {
                             if (content != null && !content.trim().isEmpty()) {
@@ -92,14 +107,35 @@ public class AIChatActivity extends AppCompatActivity {
     }
 
     // 简单意图解析并自动操作App
+    private boolean awaitingNavigationConfirm = false;
+    private boolean awaitingVideoConfirm = false;
+
     private void handleAIIntent(String reply) {
-        if (reply.contains("导航")) {
-            Intent intent = new Intent(this, NavigationActivity.class);
-            startActivity(intent);
-        } else if (reply.contains("视频")) {
-            Intent intent = new Intent(this, VideoActivity.class);
-            startActivity(intent);
+        if (awaitingNavigationConfirm) {
+            // 用户正在确认是否打开导航
+            if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")) {
+                Intent intent = new Intent(this, NavigationActivity.class);
+                startActivity(intent);
+                awaitingNavigationConfirm = false;
+            } else if (reply.contains("否") || reply.contains("不用") || reply.contains("不用了")) {
+                tvChat.append("AI: 好的，不打开导航模式。\n");
+                awaitingNavigationConfirm = false;
+            }
+            return;
         }
+
+        if (awaitingVideoConfirm) {
+            // 用户正在确认是否打开视频
+            if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")) {
+                Intent intent = new Intent(this, VideoActivity.class);
+                startActivity(intent);
+                awaitingVideoConfirm = false;
+            } else if (reply.contains("否") || reply.contains("不用") || reply.contains("不用了")) {
+                tvChat.append("AI: 好的，不打开视频模式。\n");
+                awaitingVideoConfirm = false;
+            }
+        }
+
     }
 }
 
