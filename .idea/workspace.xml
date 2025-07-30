@@ -28,46 +28,8 @@
   <component name="ChangeListManager">
     <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="换成了百度语音包现在有点鉴权问题">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/MainActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/MainActivity.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_navigation.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_navigation.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/core/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/libs/bdasr_V3_20191210_81acdf5.jar" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/assets/baidu_speech_grammar.bsg" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/assets/baidu_speech_grammar.bsg" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/InFileStream.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/InFileStream.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/InPipedStream.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/InPipedStream.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniRecog.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniRecog.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniUnit.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniUnit.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniWakeUp.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniWakeUp.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/AutoCheck.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/AutoCheck.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/MyRecognizer.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/MyRecognizer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/MessageStatusRecogListener.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/MessageStatusRecogListener.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/OnChangeLisener.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/RecogEventAdapter.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/RecogEventAdapter.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/AndroidAudioManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/AndroidAudioManager.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/BluetoothReceiver.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/BluetoothReceiver.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/HeadsetReceiver.java" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/HeadsetReceiver.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libBaiduSpeechSDK.so" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libBaiduSpeechSDK.so" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libBaiduSpeechSDK.so" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libBaiduSpeechSDK.so" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libBaiduSpeechSDK.so" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libBaiduSpeechSDK.so" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libBaiduSpeechSDK.so" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libBaiduSpeechSDK.so" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libBaiduSpeechSDK.so" beforeDir="false" afterPath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libBaiduSpeechSDK.so" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/libs.versions.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/build.gradle" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/activity/ActivityUiRecog.java" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/activity/ActivityUiRecog.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/CommonRecogParams.java" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/CommonRecogParams.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/OfflineRecogParams.java" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/OfflineRecogParams.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/CommonSetting.java" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/CommonSetting.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/layout/common.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/res/layout/common.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/layout/common_without_setting.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/res/layout/common_without_setting.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_all.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_all.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_nlu.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_nlu.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_offline.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_offline.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_online.xml" beforeDir="false" afterPath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_online.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -77,7 +39,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=C:\Users\gengke\.android\avd\Pixel_3a_XL.avd)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=L7P6R21A14000492)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -106,7 +68,7 @@
   }
 }</component>
   <component name="ProblemsViewState">
-    <option name="selectedTabId" value="ProjectErrors" />
+    <option name="selectedTabId" value="CurrentFile" />
   </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 2
@@ -272,7 +234,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753731045408</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="换成了百度语音包现在有点鉴权问题">
+      <option name="closed" value="true" />
+      <created>1753844084403</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1753844084403</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

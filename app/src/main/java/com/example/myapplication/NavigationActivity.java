@@ -31,17 +31,17 @@ import com.amap.api.navi.model.NaviLatLng;
 import com.amap.api.services.help.Inputtips;
 import com.amap.api.services.help.InputtipsQuery;
 import com.amap.api.services.help.Tip;
-import com.autonavi.ae.route.InitConfig;
 import com.baidu.aip.asrwakeup3.core.recog.MyRecognizer;
 import com.baidu.aip.asrwakeup3.core.recog.listener.MessageStatusRecogListener;
 import com.baidu.aip.asrwakeup3.core.recog.RecogResult;
-import com.baidu.aip.asrwakeup3.uiasr.params.OnlineRecogParams;
 import com.baidu.speech.asr.SpeechConstant;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.json.JSONObject;
 
 public class NavigationActivity extends AppCompatActivity implements AMapNaviListener {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
@@ -59,10 +59,10 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
     // 百度语音
     private MyRecognizer myRecognizer;
-    private OnlineRecogParams apiParams;
     private MessageStatusRecogListener recogListener;
     private Map<String, Object> recogParams;
     private boolean isListening = false;
+    private String accessToken;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -78,6 +78,9 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
         tipsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
         lvTips.setAdapter(tipsAdapter);
+
+        // 获取百度语音 Access Token
+        accessToken = TokenManager.getToken(this);
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED ||
@@ -158,15 +161,15 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         });
     }
 
-    /** 初始化语音识别 */
+    /** 初始化语音识别，使用 token 鉴权 */
     private void initSpeechRecognizer() {
         recogParams = new HashMap<>();
-        recogParams.put(com.baidu.speech.asr.SpeechConstant.VAD, com.baidu.speech.asr.SpeechConstant.VAD_TOUCH);
-        recogParams.put(com.baidu.speech.asr.SpeechConstant.DECODER, 0);
-        recogParams.put(com.baidu.speech.asr.SpeechConstant.PID, 1537);
+        recogParams.put("token", "24.df4d9c25091befb3054b3b3583c1755d.2592000.1756440191.282335-119639331");
+        recogParams.put(SpeechConstant.VAD, SpeechConstant.VAD_TOUCH);
+        recogParams.put(SpeechConstant.DECODER, 0);
+        recogParams.put(SpeechConstant.PID, 1537);
 
         Handler handler = new Handler((msg) -> true);
-
         recogListener = new MessageStatusRecogListener(handler) {
             @Override
             public void onAsrPartialResult(String[] results, RecogResult recogResult) {
@@ -242,7 +245,6 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             e.printStackTrace();
             Toast.makeText(this, "导航初始化失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-
         mAMapNavi.addAMapNaviListener(this);
     }
 
@@ -330,7 +332,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     @Override public void showLaneInfo(com.amap.api.navi.model.AMapLaneInfo[] infos, byte[] bytes, byte[] bytes1) {}
     @Override public void showLaneInfo(com.amap.api.navi.model.AMapLaneInfo info) {}
     @Override public void hideLaneInfo() {}
-    @Override public void onCalculateRouteSuccess(int[] ints) {}
+    @Override public void onCalculateRouteSuccess(int[] ints) {mAMapNavi.startNavi(NaviType.GPS);}
     @Override public void notifyParallelRoad(int i) {}
     @Override public void OnUpdateTrafficFacility(com.amap.api.navi.model.AMapNaviTrafficFacilityInfo[] infos) {}
     @Override public void OnUpdateTrafficFacility(com.amap.api.navi.model.AMapNaviTrafficFacilityInfo info) {}
