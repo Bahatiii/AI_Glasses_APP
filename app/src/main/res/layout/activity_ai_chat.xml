@@ -5,20 +5,28 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <TextView
-        android:id="@+id/tv_chat"
+    <ScrollView
+        android:id="@+id/scroll_chat"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_margin="16dp"
-        android:text="AI聊天开始...\n"
-        android:gravity="start|top"
-        android:background="#EEEEEE"
-        android:padding="8dp"
-        android:textSize="16sp"
+        android:fillViewport="true"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toTopOf="@+id/et_input"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <TextView
+            android:id="@+id/tv_chat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_margin="16dp"
+            android:text="AI聊天开始...\n"
+            android:gravity="start|top"
+            android:background="#EEEEEE"
+            android:padding="8dp"
+            android:textSize="16sp"
+            android:scrollbars="vertical"/>
+    </ScrollView>
 
     <EditText
         android:id="@+id/et_input"
@@ -29,7 +37,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@+id/btn_send"
-        app:layout_constraintTop_toBottomOf="@+id/tv_chat"/>
+        app:layout_constraintTop_toBottomOf="@+id/scroll_chat"/>
 
     <Button
         android:id="@+id/btn_send"
@@ -39,5 +47,5 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toEndOf="@+id/et_input"
-        app:layout_constraintTop_toBottomOf="@+id/tv_chat"/>
+        app:layout_constraintTop_toBottomOf="@+id/scroll_chat"/>
 </androidx.constraintlayout.widget.ConstraintLayout>
