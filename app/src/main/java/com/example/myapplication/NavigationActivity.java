@@ -164,7 +164,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     /** 初始化语音识别，使用 token 鉴权 */
     private void initSpeechRecognizer() {
         recogParams = new HashMap<>();
-        recogParams.put("token", "24.37ac1dc1bfcee56c5c701ee0866e56e1.2592000.1756451925.282335-119645819");
+        recogParams.put("token", "24.0be9e3d2811b9b5a8a06e86da1399bf9.2592000.1756462434.282335-119645819");
         recogParams.put(SpeechConstant.VAD, SpeechConstant.VAD_TOUCH);
         recogParams.put(SpeechConstant.DECODER, 0);
         recogParams.put(SpeechConstant.PID, 1537);
