@@ -31,17 +31,16 @@ import com.amap.api.navi.model.NaviLatLng;
 import com.amap.api.services.help.Inputtips;
 import com.amap.api.services.help.InputtipsQuery;
 import com.amap.api.services.help.Tip;
-import com.baidu.aip.asrwakeup3.core.recog.MyRecognizer;
-import com.baidu.aip.asrwakeup3.core.recog.listener.MessageStatusRecogListener;
-import com.baidu.aip.asrwakeup3.core.recog.RecogResult;
-import com.baidu.speech.asr.SpeechConstant;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import org.json.JSONObject;
+import com.iflytek.cloud.SpeechConstant;
+import com.iflytek.cloud.SpeechError;
+import com.iflytek.cloud.RecognizerListener;
+import com.iflytek.cloud.RecognizerResult;
+import com.iflytek.cloud.SpeechRecognizer;
+import com.iflytek.cloud.SpeechUtility;
 
 public class NavigationActivity extends AppCompatActivity implements AMapNaviListener {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
@@ -57,16 +56,16 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     private NaviLatLng mStartLatLng;
     private NaviLatLng mEndLatLng;
 
-    // 百度语音
-    private MyRecognizer myRecognizer;
-    private MessageStatusRecogListener recogListener;
-    private Map<String, Object> recogParams;
+    // 讯飞语音
+    private SpeechRecognizer mIat;
     private boolean isListening = false;
-    private String accessToken;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // 初始化讯飞SDK（只初始化一次，可放到Application）
+        SpeechUtility.createUtility(this, "appid=9be1e7dc"); // 替换为你的appid
 
         MapsInitializer.updatePrivacyShow(this, true, true);
         MapsInitializer.updatePrivacyAgree(this, true);
@@ -78,9 +77,6 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
         tipsAdapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, new ArrayList<>());
         lvTips.setAdapter(tipsAdapter);
-
-        // 获取百度语音 Access Token
-
 
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 != PackageManager.PERMISSION_GRANTED ||
@@ -149,67 +145,71 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     Toast.makeText(this, "开始语音输入", Toast.LENGTH_SHORT).show();
-                    startListening();
+                    startIat();
                     return true;
                 case MotionEvent.ACTION_UP:
                 case MotionEvent.ACTION_CANCEL:
                     Toast.makeText(this, "停止语音输入", Toast.LENGTH_SHORT).show();
-                    stopListening();
+                    stopIat();
+                    v.performClick();
                     return true;
             }
             return false;
         });
+
     }
 
-    /** 初始化语音识别，使用 token 鉴权 */
+    /** 初始化讯飞语音识别 */
     private void initSpeechRecognizer() {
-        recogParams = new HashMap<>();
-        recogParams.put("token", "24.0be9e3d2811b9b5a8a06e86da1399bf9.2592000.1756462434.282335-119645819");
-        recogParams.put(SpeechConstant.VAD, SpeechConstant.VAD_TOUCH);
-        recogParams.put(SpeechConstant.DECODER, 0);
-        recogParams.put(SpeechConstant.PID, 1537);
-
-        Handler handler = new Handler((msg) -> true);
-        recogListener = new MessageStatusRecogListener(handler) {
-            @Override
-            public void onAsrPartialResult(String[] results, RecogResult recogResult) {
-                if (results != null && results.length > 0) {
-                    String text = results[0];
-                    runOnUiThread(() -> {
-                        etSearch.setText(text);
-                        etSearch.setSelection(text.length());
-                    });
-                }
-            }
-
-            @Override
-            public void onAsrFinalResult(String[] results, RecogResult recogResult) {
-                if (results != null && results.length > 0) {
-                    String text = results[0];
-                    runOnUiThread(() -> {
-                        etSearch.setText(text);
-                        etSearch.setSelection(text.length());
-                        searchByKeyword(text);
-                    });
-                }
-            }
-        };
-        myRecognizer = new MyRecognizer(this, recogListener);
+        mIat = SpeechRecognizer.createRecognizer(this, code -> {
+            // code==0表示初始化成功
+        });
     }
 
-    private void startListening() {
-        if (!isListening) {
-            isListening = true;
-            myRecognizer.start(recogParams);
-        }
+    private void startIat() {
+        if (mIat == null) return;
+        mIat.setParameter(SpeechConstant.LANGUAGE, "zh_cn");
+        mIat.setParameter(SpeechConstant.ACCENT, "mandarin");
+        mIat.setParameter(SpeechConstant.ENGINE_TYPE, SpeechConstant.TYPE_CLOUD);
+        mIat.setParameter(SpeechConstant.RESULT_TYPE, "plain");
+        mIat.startListening(mRecognizerListener);
+        isListening = true;
     }
 
-    private void stopListening() {
-        if (isListening) {
+    private void stopIat() {
+        if (mIat != null && isListening) {
+            mIat.stopListening();
             isListening = false;
-            myRecognizer.stop();
         }
     }
+
+    private RecognizerListener mRecognizerListener = new RecognizerListener() {
+        @Override
+        public void onBeginOfSpeech() {
+            Toast.makeText(NavigationActivity.this, "开始说话", Toast.LENGTH_SHORT).show();
+        }
+        @Override
+        public void onError(SpeechError error) {
+            Toast.makeText(NavigationActivity.this, "识别错误: " + error.getPlainDescription(true), Toast.LENGTH_SHORT).show();
+        }
+        @Override
+        public void onEndOfSpeech() {
+            Toast.makeText(NavigationActivity.this, "说话结束", Toast.LENGTH_SHORT).show();
+        }
+        @Override
+        public void onResult(RecognizerResult results, boolean isLast) {
+            String text = results.getResultString();
+            if (text != null && !text.trim().isEmpty()) {
+                runOnUiThread(() -> {
+                    etSearch.setText(text);
+                    etSearch.setSelection(text.length());
+                    searchByKeyword(text);
+                });
+            }
+        }
+        @Override public void onVolumeChanged(int volume, byte[] data) {}
+        @Override public void onEvent(int eventType, int arg1, int arg2, Bundle obj) {}
+    };
 
     private void searchByKeyword(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) return;
@@ -285,7 +285,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         if (mAMapNavi != null) {mAMapNavi.stopNavi();mAMapNavi.destroy();}
         if (mAMapNaviView != null) mAMapNaviView.onDestroy();
         if (locationClient != null) {locationClient.stopLocation();locationClient.onDestroy();}
-        if (myRecognizer != null) myRecognizer.release();
+        if (mIat != null) {mIat.cancel(); mIat.destroy();}
     }
 
     @Override
