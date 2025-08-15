@@ -5,6 +5,11 @@
       <config />
     </shared>
     <layouts>
+      <layout url="file://$PROJECT_DIR$/app/src/main/res/layout/activity_ai_chat.xml">
+        <config>
+          <theme>@style/Theme.MyApplication</theme>
+        </config>
+      </layout>
       <layout url="file://$PROJECT_DIR$/app/src/main/res/layout/activity_main.xml">
         <config>
           <theme>@style/Theme.MyApplication</theme>
@@ -26,10 +31,110 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="token鉴权">
+    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="麦克风改到了右上角">
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/AIChatActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/AIChatActivity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/BaiduImageUploader.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/BaiduImageUploader.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_ai_chat.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_ai_chat.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_navigation.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_navigation.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/build.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/libs/bdasr_V3_20250507_b610f20.jar" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/proguard-rules.pro" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/AndroidManifest.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/assets/README.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/assets/WakeUp.bin" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/assets/baidu_speech_grammar.bsg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/FileAudioInputStream.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/InFileStream.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/InPipedStream.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/inputstream/MyMicrophoneInputStream.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniRecog.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniUnit.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/ActivityMiniWakeUp.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/mini/AutoCheck.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/IStatus.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/MyRecognizer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/RecogResult.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/ChainRecogListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/IRecogListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/MessageStatusRecogListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/RecogEventAdapter.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/recog/listener/StatusRecogListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/AuthUtil.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/FileUtil.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/MyLogger.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/AndroidAudioManager.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/BluetoothReceiver.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/util/bluetooth/HeadsetReceiver.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/wakeup/MyWakeup.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/wakeup/WakeUpResult.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/wakeup/WakeupEventAdapter.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/wakeup/listener/IWakeupListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/wakeup/listener/RecogWakeupListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/java/com/baidu/aip/asrwakeup3/core/wakeup/listener/SimpleWakeupListener.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libBaiduSpeechSDK.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libbdEASRAndroid.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libbdSpilWakeup.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libbd_easr_s1_merge_normal_20151216.dat.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/arm64-v8a/libvad.dnn.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libBaiduSpeechSDK.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libbdEASRAndroid.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libbdSpilWakeup.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libbd_easr_s1_merge_normal_20151216.dat.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi-v7a/libvad.dnn.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libBaiduSpeechSDK.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libbdEASRAndroid.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libbdSpilWakeup.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libbd_easr_s1_merge_normal_20151216.dat.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/armeabi/libvad.dnn.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libBaiduSpeechSDK.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libbdEASRAndroid.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libbdSpilWakeup.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libbd_easr_s1_merge_normal_20151216.dat.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86/libvad.dnn.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libBaiduSpeechSDK.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libbdEASRAndroid.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libbdSpilWakeup.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libbd_easr_s1_merge_normal_20151216.dat.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/jniLibs/x86_64/libvad.dnn.so" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/res/layout/common_mini.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/src/main/res/values/strings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/build.gradle" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/proguard-rules.pro" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/AndroidManifest.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/activity/ActivityCommon.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/activity/ActivityListMain.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/activity/ActivityUiRecog.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/AllRecogParams.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/CommonRecogParams.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/NluRecogParams.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/OfflineRecogParams.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/params/OnlineRecogParams.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/AllSetting.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/CommonSetting.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/NluSetting.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/OfflineSetting.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/java/com/baidu/aip/asrwakeup3/uiasr/setting/OnlineSetting.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/layout/common.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/layout/common_without_setting.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/raw/bdspeech_recognition_cancel.mp3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/raw/bdspeech_recognition_error.mp3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/raw/bdspeech_recognition_start.mp3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/raw/bdspeech_recognition_success.mp3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/raw/bdspeech_speech_end.mp3" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/values/strings.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_all.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_nlu.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_offline.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/res/xml/setting_online.xml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/resources/com/baidu/android/voicedemo/16k_test.pcm" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/uiasr/src/main/resources/com/baidu/android/voicedemo/offline_input.pcm" beforeDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -39,7 +144,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=C:\Users\gengke\.android\avd\Pixel_3a_XL.avd)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=L7P6R21A14000492)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -250,7 +355,15 @@
       <option name="project" value="LOCAL" />
       <updated>1753849412382</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="麦克风改到了右上角">
+      <option name="closed" value="true" />
+      <created>1753933882483</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1753933882483</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -261,7 +374,8 @@
     <MESSAGE value="换了个集成包" />
     <MESSAGE value="换成了百度语音包现在有点鉴权问题" />
     <MESSAGE value="token鉴权" />
-    <option name="LAST_COMMIT_MESSAGE" value="token鉴权" />
+    <MESSAGE value="麦克风改到了右上角" />
+    <option name="LAST_COMMIT_MESSAGE" value="麦克风改到了右上角" />
   </component>
   <component name="play_dynamic_filters_status">
     <option name="appIdToCheckInfo">
@@ -273,12 +387,12 @@
         </entry>
         <entry key="com.baidu.aip.asrwakeup3.uiasr.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1753797903892" />
+            <CheckInfo lastCheckTimestamp="1753933846025" />
           </value>
         </entry>
         <entry key="com.example.myapplication">
           <value>
-            <CheckInfo lastCheckTimestamp="1753867925407" />
+            <CheckInfo lastCheckTimestamp="1755264745461" />
           </value>
         </entry>
         <entry key="com.example.myapplication.core.test">
@@ -288,7 +402,7 @@
         </entry>
         <entry key="com.example.myapplication.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1753867925404" />
+            <CheckInfo lastCheckTimestamp="1755264745461" />
           </value>
         </entry>
         <entry key="com.example.myapplication.uiasr.test">

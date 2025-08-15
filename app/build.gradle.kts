@@ -36,8 +36,6 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activity)
     implementation(libs.constraintlayout)
-    implementation(project(":core"))
-    implementation(project(":uiasr"))
     implementation(libs.play.services.drive)
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

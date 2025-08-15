@@ -50,5 +50,4 @@ rootProject.name = "My Application"
 
 // 添加百度语音识别 Demo 模块
 include(":app")
-include(":core")
-include(":uiasr")
+

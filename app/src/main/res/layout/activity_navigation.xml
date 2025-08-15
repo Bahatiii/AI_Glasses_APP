@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     tools:context=".NavigationActivity">
 
-    <!-- 地图和导航容器 -->
-    <FrameLayout
-        android:id="@+id/navi_container"
+    <!-- 地图和导航控件 -->
+    <com.amap.api.navi.AMapNaviView
+        android:id="@+id/navi_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
@@ -43,7 +43,7 @@
         android:id="@+id/btn_voice"
         android:layout_width="56dp"
         android:layout_height="56dp"
-        android:layout_alignParentTop="true"
+        android:layout_alignParentBottom="true"
         android:layout_alignParentEnd="true"
         android:layout_margin="16dp"
         android:background="@android:drawable/btn_default"

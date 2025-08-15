@@ -19,7 +19,6 @@ public class BaiduImageUploader {
 
     // 百度图像识别 API（通用物体识别）
     private static final String API_URL = "https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic\n";
-
     /**
      * 上传 bitmap 图像并识别
      */
