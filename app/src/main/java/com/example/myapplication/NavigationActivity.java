@@ -18,6 +18,12 @@ import com.amap.api.navi.enums.NaviType;
 import com.amap.api.navi.model.*;
 import com.amap.api.services.help.*;
 
+import com.amap.api.maps.AMap;
+import com.amap.api.maps.MapView;
+import com.amap.api.maps.model.LatLng;
+import com.amap.api.maps.model.PolylineOptions;
+import android.graphics.Color;
+
 import com.iflytek.cloud.*;
 
 import java.util.*;
@@ -37,6 +43,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
     private SpeechRecognizer mIat;
     private boolean isListening = false;
+    private MapView mapView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -219,6 +226,43 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             Toast.makeText(this, "路径规划失败", Toast.LENGTH_SHORT).show();
     }
 
+    private List<com.amap.api.maps.model.Polyline> routeLines = new ArrayList<>();
+
+    private void drawRoute(Map<Integer, AMapNaviPath> paths) {
+        if (mAMapNaviView == null) return;
+        AMap aMap = mAMapNaviView.getMap();
+
+        // 移除旧路线
+        for (com.amap.api.maps.model.Polyline line : routeLines) line.remove();
+        routeLines.clear();
+
+        for (AMapNaviPath path : paths.values()) {
+            List<NaviLatLng> naviLatLngs = path.getCoordList();
+            if (naviLatLngs == null) continue;
+
+            PolylineOptions polylineOptions = new PolylineOptions();
+            polylineOptions.addAll(convertToLatLng(naviLatLngs));
+            polylineOptions.width(20f);
+            polylineOptions.color(Color.BLUE);
+            polylineOptions.setDottedLine(false);
+
+            com.amap.api.maps.model.Polyline polyline = aMap.addPolyline(polylineOptions);
+            routeLines.add(polyline);
+        }
+    }
+
+
+
+    private List<LatLng> convertToLatLng(List<NaviLatLng> naviLatLngs) {
+        List<LatLng> latLngs = new ArrayList<>();
+        for (NaviLatLng naviLatLng : naviLatLngs) {
+            latLngs.add(new LatLng(naviLatLng.getLatitude(), naviLatLng.getLongitude()));
+        }
+        return latLngs;
+    }
+
+
+
     @Override
     protected void onResume() { super.onResume(); if (mAMapNaviView != null) mAMapNaviView.onResume(); }
     @Override
@@ -244,7 +288,19 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
     // --- AMapNaviListener ---
     @Override public void onCalculateRouteSuccess(int[] ints) { mAMapNavi.startNavi(NaviType.GPS); }
-    @Override public void onCalculateRouteSuccess(AMapCalcRouteResult result) { if (mAMapNavi != null) mAMapNavi.startNavi(NaviType.GPS); }
+    @Override
+    public void onCalculateRouteSuccess(AMapCalcRouteResult result) {
+        if (mAMapNavi != null) {
+            Map<Integer, AMapNaviPath> paths = mAMapNavi.getNaviPaths();
+            if (paths != null && paths.size() > 0) {
+                drawRoute(paths);
+            } else {
+                Toast.makeText(this, "未获取到路径", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+
     @Override public void onCalculateRouteFailure(AMapCalcRouteResult result) { Toast.makeText(this, "路径规划失败：" + result.getErrorCode(), Toast.LENGTH_LONG).show(); }
 
     @Override
