@@ -34,7 +34,7 @@
             android:parentActivityName=".MainActivity" />
 
         <activity
-            android:name=".VideoActivity"
+            android:name=".VideoActivity_pi"
             android:exported="false"
             android:label="视频模式"
             android:parentActivityName=".MainActivity" />

@@ -40,7 +40,7 @@ public class MainActivity extends AppCompatActivity {
         // 点击视频模式按钮
         btnVideo.setOnClickListener(view -> {
             Toast.makeText(this, "进入视频模式", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(MainActivity.this, VideoActivity.class);
+            Intent intent = new Intent(MainActivity.this, VideoActivity_pi.class);
             startActivity(intent);
         });
 
