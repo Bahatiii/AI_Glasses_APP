@@ -1,0 +1,59 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.baidu.aip.asrwakeup3.uiasr" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6
+7    <application>
+7-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:3:5-28:19
+8        <activity
+8-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:4:9-9:55
+9            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.OnlineSetting"
+9-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:5:17-54
+10            android:configChanges="orientation|keyboardHidden|screenLayout"
+10-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:6:17-80
+11            android:label="在线识别设置"
+11-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:7:17-39
+12            android:screenOrientation="portrait"
+12-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:9:17-53
+13            android:theme="@android:style/Theme.DeviceDefault.Light" />
+13-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:8:17-73
+14        <activity
+14-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:10:9-15:55
+15            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.OfflineSetting"
+15-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:11:17-55
+16            android:configChanges="orientation|keyboardHidden|screenLayout"
+16-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:12:17-80
+17            android:label="在线识别设置"
+17-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:13:17-39
+18            android:screenOrientation="portrait"
+18-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:15:17-53
+19            android:theme="@android:style/Theme.DeviceDefault.Light" />
+19-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:14:17-73
+20        <activity
+20-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:16:9-21:55
+21            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.NluSetting"
+21-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:17:17-51
+22            android:configChanges="orientation|keyboardHidden|screenLayout"
+22-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:18:17-80
+23            android:label="语义设置"
+23-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:19:17-37
+24            android:screenOrientation="portrait"
+24-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:21:17-53
+25            android:theme="@android:style/Theme.DeviceDefault.Light" />
+25-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:20:17-73
+26        <activity
+26-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:22:9-27:55
+27            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.AllSetting"
+27-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:23:17-51
+28            android:configChanges="orientation|keyboardHidden|screenLayout"
+28-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:24:17-80
+29            android:label="识别设置"
+29-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:25:17-37
+30            android:screenOrientation="portrait"
+30-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:27:17-53
+31            android:theme="@android:style/Theme.DeviceDefault.Light" />
+31-->D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:26:17-73
+32    </application>
+33
+34</manifest>

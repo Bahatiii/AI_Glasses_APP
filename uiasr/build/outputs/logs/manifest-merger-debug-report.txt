@@ -1,0 +1,67 @@
+-- Merging decision tree log ---
+manifest
+ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:1:1-29:12
+INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:1:1-29:12
+	package
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:2:11-51
+		INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml
+	xmlns:android
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:1:11-69
+application
+ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:3:5-28:19
+activity#com.baidu.aip.asrwakeup3.uiasr.setting.OnlineSetting
+ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:4:9-9:55
+	android:screenOrientation
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:9:17-53
+	android:label
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:7:17-39
+	android:configChanges
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:6:17-80
+	android:theme
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:8:17-73
+	android:name
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:5:17-54
+activity#com.baidu.aip.asrwakeup3.uiasr.setting.OfflineSetting
+ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:10:9-15:55
+	android:screenOrientation
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:15:17-53
+	android:label
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:13:17-39
+	android:configChanges
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:12:17-80
+	android:theme
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:14:17-73
+	android:name
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:11:17-55
+activity#com.baidu.aip.asrwakeup3.uiasr.setting.NluSetting
+ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:16:9-21:55
+	android:screenOrientation
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:21:17-53
+	android:label
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:19:17-37
+	android:configChanges
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:18:17-80
+	android:theme
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:20:17-73
+	android:name
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:17:17-51
+activity#com.baidu.aip.asrwakeup3.uiasr.setting.AllSetting
+ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:22:9-27:55
+	android:screenOrientation
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:27:17-53
+	android:label
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:25:17-37
+	android:configChanges
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:24:17-80
+	android:theme
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:26:17-73
+	android:name
+		ADDED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml:23:17-51
+uses-sdk
+INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml
+INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml
+	android:targetSdkVersion
+		INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml
+	android:minSdkVersion
+		INJECTED from D:\AIGLASSES1.0\uiasr\src\main\AndroidManifest.xml

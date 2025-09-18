@@ -1,0 +1,6 @@
+int id btn 0x0
+int id btn_stop 0x0
+int id txtLog 0x0
+int id txtResult 0x0
+int layout common_mini 0x0
+int string app_name 0x0

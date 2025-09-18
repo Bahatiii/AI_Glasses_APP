@@ -1,0 +1,7 @@
+com.baidu.aip.asrwakeup3.core
+id btn
+id btn_stop
+id txtLog
+id txtResult
+layout common_mini
+string app_name

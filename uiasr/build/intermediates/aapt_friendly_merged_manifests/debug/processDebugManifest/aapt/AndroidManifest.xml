@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.baidu.aip.asrwakeup3.uiasr" >
+
+    <uses-sdk android:minSdkVersion="24" />
+
+    <application>
+        <activity
+            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.OnlineSetting"
+            android:configChanges="orientation|keyboardHidden|screenLayout"
+            android:label="在线识别设置"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+        <activity
+            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.OfflineSetting"
+            android:configChanges="orientation|keyboardHidden|screenLayout"
+            android:label="在线识别设置"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+        <activity
+            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.NluSetting"
+            android:configChanges="orientation|keyboardHidden|screenLayout"
+            android:label="语义设置"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+        <activity
+            android:name="com.baidu.aip.asrwakeup3.uiasr.setting.AllSetting"
+            android:configChanges="orientation|keyboardHidden|screenLayout"
+            android:label="识别设置"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.DeviceDefault.Light" />
+    </application>
+
+</manifest>

@@ -1,0 +1,34 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.baidu.aip.asrwakeup3.core" >
+4
+5    <uses-sdk android:minSdkVersion="24" />
+6
+7    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+7-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:2:5-71
+7-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:2:22-68
+8    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+8-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:3:5-79
+8-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:3:22-76
+9    <uses-permission android:name="android.permission.INTERNET" />
+9-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:4:5-67
+9-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:4:22-64
+10    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+10-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:5:5-81
+10-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:5:22-78
+11
+12    <!-- 蓝牙录音使用，不需要可以去除 -->
+13    <uses-permission android:name="android.permission.BROADCAST_STICKY" />
+13-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:8:5-75
+13-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:8:22-72
+14    <uses-permission android:name="android.permission.BLUETOOTH" />
+14-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:9:5-68
+14-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:9:22-65
+15    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+15-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:10:5-80
+15-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:10:22-77
+16    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+16-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:11:5-74
+16-->D:\AIGLASSES1.0\core\src\main\AndroidManifest.xml:11:22-71
+17
+18</manifest>
