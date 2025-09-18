@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
 
 import androidx.annotation.NonNull;
@@ -32,6 +34,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     private EditText etSearch;
     private ListView lvTips;
+    private View searchBarContainer;
     private ArrayAdapter<String> tipsAdapter;
     private List<Tip> tipList = new ArrayList<>();
     private ImageButton btnVoice;
@@ -58,6 +61,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         mAMapNaviView.onCreate(savedInstanceState);
 
         etSearch = findViewById(R.id.et_search);
+        searchBarContainer = findViewById(R.id.search_bar_container);
         lvTips = findViewById(R.id.lv_tips);
         btnVoice = findViewById(R.id.btn_voice);
 
@@ -100,6 +104,23 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 else lvTips.setVisibility(android.view.View.GONE);
             }
         });
+        // 监听软键盘的确认/搜索按钮
+        etSearch.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH ||
+                    actionId == android.view.inputmethod.EditorInfo.IME_ACTION_DONE ||
+                    (event != null && event.getKeyCode() == android.view.KeyEvent.KEYCODE_ENTER && event.getAction() == android.view.KeyEvent.ACTION_DOWN)) {
+                // 隐藏提示列表和整个搜索条
+                lvTips.setVisibility(android.view.View.GONE);
+                if (searchBarContainer != null) searchBarContainer.setVisibility(android.view.View.GONE);
+                // 收起软键盘
+                android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(etSearch.getWindowToken(), 0);
+                }
+                return true;
+            }
+            return false;
+        });
     }
 
     private void setupTipsClick() {
@@ -107,6 +128,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             Tip tip = tipList.get(position);
             etSearch.setText(tip.getName());
             lvTips.setVisibility(android.view.View.GONE);
+            if (searchBarContainer != null) searchBarContainer.setVisibility(android.view.View.GONE);
             if (tip.getPoint() != null) {
                 mEndLatLng = new NaviLatLng(tip.getPoint().getLatitude(), tip.getPoint().getLongitude());
                 Toast.makeText(this, "已选终点: " + tip.getName(), Toast.LENGTH_SHORT).show();
@@ -199,6 +221,114 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         AMapNaviViewOptions options = mAMapNaviView.getViewOptions();
         options.setLayoutVisible(true);
         mAMapNaviView.setViewOptions(options);
+
+        // 尝试拦截导航视图内置的退出/返回按钮，优先使用 SDK 提供的 listener（若存在），否则尝试查找常见的返回按钮 id 并设置点击事件
+        try {
+            // 反射尝试 setAMapNaviViewListener 方法（不同 SDK 版本名可能不同）
+            java.lang.reflect.Method m = mAMapNaviView.getClass().getMethod("setAMapNaviViewListener", Class.forName("com.amap.api.navi.AMapNaviViewListener"));
+            if (m != null) {
+                Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                        getClassLoader(),
+                        new Class[]{Class.forName("com.amap.api.navi.AMapNaviViewListener")},
+                        (proxyObj, method, args) -> {
+                            if ("onNaviCancel".equals(method.getName()) || "onNaviBackClick".equals(method.getName())) {
+                                runOnUiThread(() -> finish());
+                                return null;
+                            }
+                            return null;
+                        }
+                );
+                m.invoke(mAMapNaviView, proxy);
+            }
+        } catch (Exception ignored) {
+            // 回退方案：尝试查找常见的返回按钮 id 并设置 onClick
+            String[] candidateIds = new String[]{"amap_navi_view_back", "navi_view_back", "amap_navi_view_quit", "navi_quit"};
+            for (String idName : candidateIds) {
+                int id = getResources().getIdentifier(idName, "id", getPackageName());
+                if (id != 0) {
+                    View back = mAMapNaviView.findViewById(id);
+                    if (back != null) {
+                        back.setOnClickListener(v -> finish());
+                        break;
+                    }
+                }
+            }
+            // 如果仍然没有找到，枚举 mAMapNaviView 的方法以便定位可用的 setXxxListener 方法（调试信息）
+            try {
+                java.lang.reflect.Method[] methods = mAMapNaviView.getClass().getMethods();
+                StringBuilder sb = new StringBuilder();
+                int count = 0;
+                for (java.lang.reflect.Method method : methods) {
+                    String name = method.getName();
+                    if (name.toLowerCase().contains("listener") || name.toLowerCase().startsWith("set")) {
+                        if (sb.length() > 0) sb.append("\n");
+                        sb.append(name);
+                        count++;
+                        if (count >= 12) break;
+                    }
+                }
+                final String toast = "mAMapNaviView methods (sample):\n" + (sb.length() > 0 ? sb.toString() : "(no candidate methods found)");
+                final int toastCount = count;
+                runOnUiThread(() -> Toast.makeText(this, toast, Toast.LENGTH_LONG).show());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        // 最后再尝试扫描整个窗口的视图树，查找可能的“退出/返回”按钮并附加监听（通过 id 名称、文本或 contentDescription）
+        hookExitButtonByAttributes();
+    }
+
+    // 在整个 window decor view 中查找可能的退出按钮，并附加 finish() 行为
+    private void hookExitButtonByAttributes() {
+        View decor = getWindow() != null ? getWindow().getDecorView() : null;
+        if (decor == null) return;
+        List<View> candidates = new ArrayList<>();
+        Queue<View> q = new LinkedList<>();
+        q.add(decor);
+        while (!q.isEmpty()) {
+            View v = q.poll();
+            if (v == null) continue;
+            // check id name
+            try {
+                int id = v.getId();
+                if (id != View.NO_ID) {
+                    String name = getResources().getResourceEntryName(id).toLowerCase();
+                    if (name.contains("quit") || name.contains("exit") || name.contains("back") || name.contains("返回") || name.contains("退出") || name.contains("cancel")) {
+                        candidates.add(v);
+                    }
+                }
+            } catch (Exception ignored) {}
+            // check contentDescription
+            CharSequence cd = v.getContentDescription();
+            if (cd != null) {
+                String s = cd.toString().toLowerCase();
+                if (s.contains("quit") || s.contains("exit") || s.contains("back") || s.contains("返回") || s.contains("退出") || s.contains("cancel")) {
+                    candidates.add(v);
+                }
+            }
+            // check text if TextView
+            if (v instanceof TextView) {
+                String txt = ((TextView) v).getText() != null ? ((TextView) v).getText().toString().toLowerCase() : "";
+                if (txt.contains("退出") || txt.contains("返回") || txt.contains("quit") || txt.contains("exit") || txt.contains("back") || txt.contains("cancel")) {
+                    candidates.add(v);
+                }
+            }
+            if (v instanceof ViewGroup) {
+                ViewGroup vg = (ViewGroup) v;
+                for (int i = 0; i < vg.getChildCount(); i++) q.add(vg.getChildAt(i));
+            }
+        }
+
+        for (View c : candidates) {
+            // attach listener if clickable
+            c.setClickable(true);
+            c.setOnClickListener(v -> {
+                Toast.makeText(this, "捕获到退出按钮（通过属性），已返回", Toast.LENGTH_SHORT).show();
+                // 停止导航并返回
+                try { if (mAMapNavi != null) mAMapNavi.stopNavi(); } catch (Exception ignored) {}
+                finish();
+            });
+        }
     }
 
     private void startLocation() {
@@ -275,6 +405,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         if (locationClient != null) { locationClient.stopLocation(); locationClient.onDestroy(); }
         if (mIat != null) { mIat.cancel(); mIat.destroy(); }
     }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
