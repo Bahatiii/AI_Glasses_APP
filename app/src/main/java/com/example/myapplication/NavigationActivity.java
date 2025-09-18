@@ -1,13 +1,15 @@
 package com.example.myapplication;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
-
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -30,7 +32,7 @@ import com.iflytek.cloud.*;
 
 import java.util.*;
 
-public class NavigationActivity extends AppCompatActivity implements AMapNaviListener {
+public class NavigationActivity extends AppCompatActivity implements AMapNaviListener, PatrickAIManager.PatrickCallback {
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     private EditText etSearch;
     private ListView lvTips;
@@ -44,9 +46,41 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     private AMapNaviView mAMapNaviView;
     private NaviLatLng mStartLatLng, mEndLatLng;
 
+    // 保留原有的语音识别（手动按钮）
     private SpeechRecognizer mIat;
     private boolean isListening = false;
     private MapView mapView;
+
+    // 新增：全局Patrick AI
+    private PatrickAIManager patrickAI;
+    private boolean isWaitingForDestination = false; // 等待用户确认目的地
+    private String pendingDestination = null; // 待确认的目的地
+
+    // 新增：搜索结果选择逻辑
+    private boolean isAskingForDestinationChoice = false; // 正在询问搜索结果
+    private int currentAskingIndex = 0; // 当前询问的索引
+    private List<Tip> currentSearchResults = new ArrayList<>(); // 当前搜索结果
+
+    // 新增：防止重复搜索的标志
+    private boolean isSearchingProgrammatically = false;
+
+    // 新增：TTS协调管理
+    private boolean isPatrickSpeaking = false;
+    private boolean isNaviSpeaking = false;
+    private Handler ttsHandler = new Handler();
+    private Queue<String> naviVoiceQueue = new LinkedList<>(); // 导航语音队列
+
+    // **新增：导航阶段状态枚举**
+    public enum NavigationPhase {
+        IDLE,                    // 空闲状态
+        SEARCHING_DESTINATION,   // 搜索目的地中
+        ASKING_DESTINATION,      // 询问目的地确认中
+        CHOOSING_FROM_RESULTS,   // 从搜索结果中选择
+        ROUTE_PLANNING,          // 路线规划中
+        NAVIGATION_STARTED       // 导航已开始
+    }
+
+    private NavigationPhase currentPhase = NavigationPhase.IDLE;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +89,10 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         MapsInitializer.updatePrivacyShow(this, true, true);
         MapsInitializer.updatePrivacyAgree(this, true);
         setContentView(R.layout.activity_navigation);
+
+        // 初始化全局Patrick AI
+        patrickAI = PatrickAIManager.getInstance(this);
+        patrickAI.setCallback(this);
 
         // 找到布局控件
         mAMapNaviView = findViewById(R.id.navi_view);
@@ -79,6 +117,260 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         setupSearchListener();
         setupTipsClick();
         setupVoiceButton();
+
+        // Patrick进入导航模式的欢迎语
+        new Handler().postDelayed(() -> {
+            patrickAI.patrickSpeak("已进入导航模式，请告诉我你要去哪里，或者你可以直接在搜索框输入目的地");
+        }, 1000);
+    }
+
+    // === Patrick AI 回调接口实现 ===
+    @Override
+    public void onPatrickSpeak(String text) {
+        runOnUiThread(() -> {
+            isPatrickSpeaking = true;
+
+            Toast.makeText(this, "Patrick: " + text, Toast.LENGTH_SHORT).show();
+
+            // 估算Patrick说话时长
+            int speakDuration = Math.max(2000, text.length() * 100);
+
+            // Patrick说话结束后的处理
+            ttsHandler.postDelayed(() -> {
+                isPatrickSpeaking = false;
+
+                // 播放积压的导航语音
+                if (!naviVoiceQueue.isEmpty()) {
+                    String nextNaviText = naviVoiceQueue.poll();
+                    Log.d("NavigationActivity", "Patrick说话结束，播放积压的导航语音: " + nextNaviText);
+                    playNavigationVoice(nextNaviText);
+                }
+
+            }, speakDuration);
+        });
+    }
+
+    @Override
+    public void onUserSpeak(String text) {
+        Log.d("NavigationActivity", "=== onUserSpeak 被调用 ===");
+        Log.d("NavigationActivity", "接收到用户语音: " + text);
+        Log.d("NavigationActivity", "当前状态 - isWaitingForDestination: " + isWaitingForDestination);
+        Log.d("NavigationActivity", "当前状态 - isAskingForDestinationChoice: " + isAskingForDestinationChoice);
+        Log.d("NavigationActivity", "当前状态 - pendingDestination: " + pendingDestination);
+        Log.d("NavigationActivity", "当前状态 - currentAskingIndex: " + currentAskingIndex);
+        Log.d("NavigationActivity", "当前阶段: " + currentPhase);
+
+        runOnUiThread(() -> {
+            // 处理用户的语音输入
+            handleUserVoiceInput(text);
+        });
+    }
+
+    @Override
+    public void onNavigationRequest() {
+        // 已经在导航模式，Patrick说明一下
+        patrickAI.patrickSpeak("我们已经在导航模式了，请告诉我你要去哪里");
+    }
+
+    @Override
+    public void onVideoRequest() {
+        runOnUiThread(() -> {
+            Intent intent = new Intent(this, VideoActivity_pi.class);
+            startActivity(intent);
+        });
+    }
+
+    // 处理用户语音输入的导航相关逻辑
+    private void handleUserVoiceInput(String text) {
+        Log.d("NavigationActivity", "=== handleUserVoiceInput 开始 ===");
+        Log.d("NavigationActivity", "处理用户输入: " + text + ", 当前阶段: " + currentPhase);
+
+        if (isAskingForDestinationChoice) {
+            Log.d("NavigationActivity", "当前在询问目的地选择状态");
+            // 正在询问搜索结果选择
+            handleDestinationChoiceResponse(text);
+        } else if (isWaitingForDestination) {
+            Log.d("NavigationActivity", "当前在等待目的地确认状态");
+            // 正在等待用户确认目的地
+            if (text.contains("是") || text.contains("好的") || text.contains("确定") ||
+                    text.contains("可以") || text.contains("对") || text.contains("是的") ||
+                    text.contains("嗯") || text.contains("行") || text.contains("OK") ||
+                    text.contains("可以的") || text.contains("没错")) {
+                Log.d("NavigationActivity", "用户确认目的地: " + pendingDestination);
+                if (pendingDestination != null) {
+                    // **设置搜索阶段**
+                    currentPhase = NavigationPhase.SEARCHING_DESTINATION;
+
+                    // 确认目的地，开始搜索（设置标志防止重复）
+                    isSearchingProgrammatically = true;
+                    etSearch.setText(pendingDestination);
+                    isSearchingProgrammatically = false;
+
+                    // 手动调用搜索，只调用一次
+                    searchByKeyword(pendingDestination);
+                    patrickAI.patrickSpeak("好的，我来为你搜索" + pendingDestination);
+
+                    isWaitingForDestination = false;
+                    pendingDestination = null;
+                }
+            } else if (text.contains("不") || text.contains("错") || text.contains("不是") ||
+                    text.contains("不对") || text.contains("不是的") || text.contains("错了")) {
+                Log.d("NavigationActivity", "用户拒绝目的地，重新询问");
+
+                // **重置为空闲状态**
+                currentPhase = NavigationPhase.IDLE;
+
+                patrickAI.patrickSpeak("好的，请重新告诉我你要去哪里");
+                isWaitingForDestination = false;
+                pendingDestination = null;
+            } else {
+                Log.d("NavigationActivity", "用户说了新的目的地，重新处理");
+                // 用户说了新的目的地
+                processPotentialDestination(text);
+            }
+        } else {
+            Log.d("NavigationActivity", "正常状态，检查是否为目的地输入");
+            // 正常状态，检查是否为目的地输入
+            processPotentialDestination(text);
+        }
+    }
+
+    // 处理搜索结果选择的回应
+    private void handleDestinationChoiceResponse(String text) {
+        Log.d("NavigationActivity", "=== handleDestinationChoiceResponse ===");
+        Log.d("NavigationActivity", "处理选择回应: " + text + ", 阶段: " + currentPhase);
+        Log.d("NavigationActivity", "当前询问索引: " + currentAskingIndex);
+
+        if (text.contains("是") || text.contains("好的") || text.contains("确定") ||
+                text.contains("可以") || text.contains("对") || text.contains("是的") ||
+                text.contains("嗯") || text.contains("行") || text.contains("OK") ||
+                text.contains("可以的") || text.contains("没错")) {
+            Log.d("NavigationActivity", "用户确认当前选项");
+            // 用户确认当前选项
+            if (currentAskingIndex < currentSearchResults.size()) {
+                Tip selectedTip = currentSearchResults.get(currentAskingIndex);
+                Log.d("NavigationActivity", "选择目的地: " + selectedTip.getName());
+                selectDestination(selectedTip);
+            }
+            isAskingForDestinationChoice = false;
+        } else if (text.contains("不") || text.contains("错") || text.contains("不是") ||
+                text.contains("下一个") || text.contains("不对") || text.contains("不是的") ||
+                text.contains("错了") || text.contains("换一个")) {
+            Log.d("NavigationActivity", "用户拒绝当前选项，询问下一个");
+            // 用户拒绝当前选项，询问下一个
+            askNextDestination();
+        } else {
+            Log.d("NavigationActivity", "用户输入无法识别，重新询问当前选项");
+            // 用户可能说了其他内容，重新询问当前选项
+            if (currentAskingIndex < currentSearchResults.size()) {
+                Tip currentTip = currentSearchResults.get(currentAskingIndex);
+                patrickAI.patrickSpeak("请确认，你要去" + currentTip.getName() + "吗？");
+            }
+        }
+    }
+
+    // 询问下一个目的地
+    private void askNextDestination() {
+        currentAskingIndex++;
+        if (currentAskingIndex < currentSearchResults.size()) {
+            // 还有下一个选项
+            Tip nextTip = currentSearchResults.get(currentAskingIndex);
+            patrickAI.patrickSpeak("那你要去" + nextTip.getName() + "吗？");
+        } else {
+            // 所有选项都询问完了，自动选择第一个
+            if (currentSearchResults.size() > 0) {
+                Tip firstTip = currentSearchResults.get(0);
+                patrickAI.patrickSpeak("好的，我为你自动选择第一个选项：" + firstTip.getName());
+                selectDestination(firstTip);
+            } else {
+                // **重置为空闲状态**
+                currentPhase = NavigationPhase.IDLE;
+                patrickAI.patrickSpeak("没有找到合适的地点，请重新搜索");
+            }
+            isAskingForDestinationChoice = false;
+        }
+    }
+
+    // 选择目的地并开始导航
+    private void selectDestination(Tip selectedTip) {
+        Log.d("NavigationActivity", "选择目的地: " + selectedTip.getName());
+
+        // **设置路线规划阶段**
+        currentPhase = NavigationPhase.ROUTE_PLANNING;
+
+        // 设置标志，防止触发TextWatcher
+        isSearchingProgrammatically = true;
+        etSearch.setText(selectedTip.getName());
+        isSearchingProgrammatically = false;
+
+        lvTips.setVisibility(View.GONE);
+        if (searchBarContainer != null) searchBarContainer.setVisibility(View.GONE);
+
+        if (selectedTip.getPoint() != null) {
+            mEndLatLng = new NaviLatLng(selectedTip.getPoint().getLatitude(), selectedTip.getPoint().getLongitude());
+
+            // Patrick语音反馈
+            patrickAI.patrickSpeak("好的，我为你规划到" + selectedTip.getName() + "的路线");
+
+            Toast.makeText(this, "已选终点: " + selectedTip.getName(), Toast.LENGTH_SHORT).show();
+            startWalkNavigation();
+        } else {
+            // **重置为空闲状态**
+            currentPhase = NavigationPhase.IDLE;
+
+            Toast.makeText(this, "该地点暂无坐标", Toast.LENGTH_SHORT).show();
+            patrickAI.patrickSpeak("抱歉，该地点无法导航，请重新选择");
+        }
+    }
+
+    // 处理可能的目的地输入
+    private void processPotentialDestination(String text) {
+        Log.d("NavigationActivity", "=== processPotentialDestination ===");
+        Log.d("NavigationActivity", "处理潜在目的地: " + text);
+
+        // 过滤明显不是地名的输入
+        String[] nonLocationWords = {"你好", "再见", "谢谢", "天气", "时间", "今天", "明天", "什么", "怎么", "为什么"};
+        for (String word : nonLocationWords) {
+            if (text.contains(word)) {
+                Log.d("NavigationActivity", "包含非地名词汇: " + word + "，忽略处理");
+                // 这不像是地名，让Patrick正常回复
+                return;
+            }
+        }
+
+        // 检查是否包含地名相关关键词
+        if (text.contains("去") || text.contains("到") || text.contains("找") ||
+                text.contains("导航") || text.contains("路线") ||
+                text.length() > 2) { // 长度大于2可能是地名
+
+            Log.d("NavigationActivity", "符合地名特征，提取目的地");
+            // 提取可能的目的地
+            String destination = extractDestination(text);
+            Log.d("NavigationActivity", "提取的目的地: " + destination);
+
+            if (destination != null && !destination.trim().isEmpty()) {
+                // **设置阶段状态**
+                currentPhase = NavigationPhase.ASKING_DESTINATION;
+
+                pendingDestination = destination;
+                isWaitingForDestination = true;
+                Log.d("NavigationActivity", "设置待确认目的地: " + destination + ", 阶段: " + currentPhase);
+                patrickAI.patrickSpeak("你是要去" + destination + "吗？");
+            }
+        } else {
+            Log.d("NavigationActivity", "不符合地名特征，忽略");
+        }
+    }
+
+    // 从用户输入中提取目的地
+    private String extractDestination(String text) {
+        // 去除常见的前缀词
+        String destination = text.replaceAll("我要去|我想去|去|到|找|导航到|路线到", "").trim();
+
+        // 去除常见的后缀词
+        destination = destination.replaceAll("怎么走|在哪里|怎么去", "").trim();
+
+        return destination;
     }
 
     private boolean checkPermissions() {
@@ -100,8 +392,17 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             public void afterTextChanged(android.text.Editable s) {}
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() > 0) searchByKeyword(s.toString());
-                else lvTips.setVisibility(android.view.View.GONE);
+                // 如果是程序设置的文本，不触发搜索
+                if (isSearchingProgrammatically) {
+                    Log.d("NavigationActivity", "程序设置文本，跳过自动搜索");
+                    return;
+                }
+
+                if (s.length() > 0) {
+                    searchByKeyword(s.toString());
+                } else {
+                    lvTips.setVisibility(android.view.View.GONE);
+                }
             }
         });
         // 监听软键盘的确认/搜索按钮
@@ -124,29 +425,30 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     }
 
     private void setupTipsClick() {
+        // 保留手动点击功能，但通常会被AI语音选择替代
         lvTips.setOnItemClickListener((parent, view, position, id) -> {
-            Tip tip = tipList.get(position);
-            etSearch.setText(tip.getName());
-            lvTips.setVisibility(android.view.View.GONE);
-            if (searchBarContainer != null) searchBarContainer.setVisibility(android.view.View.GONE);
-            if (tip.getPoint() != null) {
-                mEndLatLng = new NaviLatLng(tip.getPoint().getLatitude(), tip.getPoint().getLongitude());
-                Toast.makeText(this, "已选终点: " + tip.getName(), Toast.LENGTH_SHORT).show();
-                startWalkNavigation();
-            } else {
-                Toast.makeText(this, "该地点暂无坐标", Toast.LENGTH_SHORT).show();
+            if (position < tipList.size()) {
+                selectDestination(tipList.get(position));
+                // 停止AI询问流程
+                isAskingForDestinationChoice = false;
             }
         });
     }
 
     private void setupVoiceButton() {
+        // 修改语音按钮提示，说明Patrick一直在监听
+        btnVoice.setOnClickListener(v -> {
+            Toast.makeText(this, "Patrick正在持续监听，你可以直接说话。这个按钮用于手动语音输入", Toast.LENGTH_LONG).show();
+        });
+
+        // 保留原有的手动语音识别功能
         btnVoice.setOnTouchListener((v, event) -> {
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                Toast.makeText(this, "开始语音输入", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "开始手动语音输入", Toast.LENGTH_SHORT).show();
                 startIat();
                 return true;
             } else if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL) {
-                Toast.makeText(this, "停止语音输入", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "停止手动语音输入", Toast.LENGTH_SHORT).show();
                 stopIat();
                 v.performClick();
                 return true;
@@ -193,26 +495,74 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     };
 
     private void searchByKeyword(String keyword) {
+        Log.d("NavigationActivity", "开始搜索关键词: " + keyword + ", 阶段: " + currentPhase);
+
         Inputtips inputTips = new Inputtips(this, new InputtipsQuery(keyword, ""));
         inputTips.setInputtipsListener((list, rCode) -> {
+            Log.d("NavigationActivity", "搜索结果回调，rCode: " + rCode + ", 结果数量: " + (list != null ? list.size() : 0));
+
             if (rCode == 1000 && list != null) {
                 tipList = list;
+                currentSearchResults = new ArrayList<>(list); // 保存搜索结果用于AI询问
                 List<String> names = new ArrayList<>();
                 for (Tip tip : list) names.add(tip.getName());
                 tipsAdapter.clear();
                 tipsAdapter.addAll(names);
                 tipsAdapter.notifyDataSetChanged();
                 lvTips.setVisibility(android.view.View.VISIBLE);
-            } else lvTips.setVisibility(android.view.View.GONE);
+
+                // Patrick开始逐个询问搜索结果（只说一次）
+                if (names.size() > 0) {
+                    // **设置选择阶段**
+                    currentPhase = NavigationPhase.CHOOSING_FROM_RESULTS;
+
+                    Log.d("NavigationActivity", "找到搜索结果，准备询问，阶段: " + currentPhase);
+                    patrickAI.patrickSpeak("找到了" + names.size() + "个相关地点");
+                    startAskingDestinations();
+                } else {
+                    // **重置为空闲状态**
+                    currentPhase = NavigationPhase.IDLE;
+
+                    Log.d("NavigationActivity", "没有找到搜索结果");
+                    patrickAI.patrickSpeak("没有找到相关地点，请重新输入");
+                }
+            } else {
+                // **重置为空闲状态**
+                currentPhase = NavigationPhase.IDLE;
+
+                Log.d("NavigationActivity", "搜索失败，rCode: " + rCode);
+                lvTips.setVisibility(android.view.View.GONE);
+                patrickAI.patrickSpeak("搜索出现问题，请重试");
+            }
         });
         inputTips.requestInputtipsAsyn();
     }
 
+    // 开始询问目的地选择
+    private void startAskingDestinations() {
+        if (currentSearchResults.size() > 0) {
+            isAskingForDestinationChoice = true;
+            currentAskingIndex = 0;
+
+            // 延迟1秒后开始询问第一个选项
+            new Handler().postDelayed(() -> {
+                if (isAskingForDestinationChoice && currentAskingIndex < currentSearchResults.size()) {
+                    Tip firstTip = currentSearchResults.get(currentAskingIndex);
+                    patrickAI.patrickSpeak("你要去" + firstTip.getName() + "吗？");
+                }
+            }, 1000);
+        }
+    }
+
+    // === 以下保持原有的导航功能不变 ===
     private void initNavi() {
         try {
             mAMapNavi = AMapNavi.getInstance(getApplicationContext());
             mAMapNavi.addAMapNaviListener(this);
-            mAMapNavi.setUseInnerVoice(true);
+
+            // **关键修改：禁用内置语音，改为手动捕获和播报**
+            mAMapNavi.setUseInnerVoice(false); // 禁用内置语音
+
         } catch (Exception e) {
             Toast.makeText(this, "导航初始化失败：" + e.getMessage(), Toast.LENGTH_LONG).show();
         }
@@ -274,7 +624,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 e.printStackTrace();
             }
         }
-        // 最后再尝试扫描整个窗口的视图树，查找可能的“退出/返回”按钮并附加监听（通过 id 名称、文本或 contentDescription）
+        // 最后再尝试扫描整个窗口的视图树，查找可能的"退出/返回"按钮并附加监听（通过 id 名称、文本或 contentDescription）
         hookExitButtonByAttributes();
     }
 
@@ -352,8 +702,11 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
             Toast.makeText(this, "起点或终点为空", Toast.LENGTH_SHORT).show();
             return;
         }
-        if (!mAMapNavi.calculateWalkRoute(mStartLatLng, mEndLatLng))
+        if (!mAMapNavi.calculateWalkRoute(mStartLatLng, mEndLatLng)) {
             Toast.makeText(this, "路径规划失败", Toast.LENGTH_SHORT).show();
+        } else {
+            patrickAI.patrickSpeak("开始为你导航，请注意路况安全");
+        }
     }
 
     private List<com.amap.api.maps.model.Polyline> routeLines = new ArrayList<>();
@@ -381,8 +734,6 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         }
     }
 
-
-
     private List<LatLng> convertToLatLng(List<NaviLatLng> naviLatLngs) {
         List<LatLng> latLngs = new ArrayList<>();
         for (NaviLatLng naviLatLng : naviLatLngs) {
@@ -391,12 +742,24 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         return latLngs;
     }
 
-
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (mAMapNaviView != null) mAMapNaviView.onResume();
+        // 恢复Patrick AI监听
+        if (patrickAI != null) {
+            patrickAI.setCallback(this);
+            patrickAI.resumeListening();
+        }
+    }
 
     @Override
-    protected void onResume() { super.onResume(); if (mAMapNaviView != null) mAMapNaviView.onResume(); }
-    @Override
-    protected void onPause() { super.onPause(); if (mAMapNaviView != null) mAMapNaviView.onPause(); }
+    protected void onPause() {
+        super.onPause();
+        if (mAMapNaviView != null) mAMapNaviView.onPause();
+        if (patrickAI != null) patrickAI.pauseListening();
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -404,8 +767,8 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         if (mAMapNaviView != null) mAMapNaviView.onDestroy();
         if (locationClient != null) { locationClient.stopLocation(); locationClient.onDestroy(); }
         if (mIat != null) { mIat.cancel(); mIat.destroy(); }
+        if (patrickAI != null) patrickAI.setCallback(null);
     }
-
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -417,48 +780,101 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         } else Toast.makeText(this, "需要全部权限以开始导航", Toast.LENGTH_SHORT).show();
     }
 
-    // --- AMapNaviListener ---
+    // === AMapNaviListener 实现 ===
     @Override public void onCalculateRouteSuccess(int[] ints) { mAMapNavi.startNavi(NaviType.GPS); }
+
     @Override
     public void onCalculateRouteSuccess(AMapCalcRouteResult result) {
         if (mAMapNavi != null) {
             Map<Integer, AMapNaviPath> paths = mAMapNavi.getNaviPaths();
             if (paths != null && paths.size() > 0) {
                 drawRoute(paths);
+
+                // **设置导航开始阶段 - 现在可以播放导航语音了**
+                currentPhase = NavigationPhase.NAVIGATION_STARTED;
+
+                Log.d("NavigationActivity", "路线规划成功，进入导航阶段: " + currentPhase);
+                patrickAI.patrickSpeak("路线规划成功，导航已开始，我会为你播报路况");
             } else {
+                // **重置为空闲状态**
+                currentPhase = NavigationPhase.IDLE;
                 Toast.makeText(this, "未获取到路径", Toast.LENGTH_SHORT).show();
             }
         }
     }
 
-
-    @Override public void onCalculateRouteFailure(AMapCalcRouteResult result) { Toast.makeText(this, "路径规划失败：" + result.getErrorCode(), Toast.LENGTH_LONG).show(); }
-
     @Override
-    public void onNaviRouteNotify(AMapNaviRouteNotifyData aMapNaviRouteNotifyData) {
+    public void onCalculateRouteFailure(AMapCalcRouteResult result) {
+        // **重置为空闲状态**
+        currentPhase = NavigationPhase.IDLE;
 
+        Toast.makeText(this, "路径规划失败：" + result.getErrorCode(), Toast.LENGTH_LONG).show();
+        patrickAI.patrickSpeak("路径规划失败，请重新选择目的地");
     }
 
-    // --- 其他空方法保持不变 ---
+    @Override public void onNaviRouteNotify(AMapNaviRouteNotifyData aMapNaviRouteNotifyData) {}
     @Override public void notifyParallelRoad(int i) {}
     @Override public void OnUpdateTrafficFacility(AMapNaviTrafficFacilityInfo[] aMapNaviTrafficFacilityInfos) {}
     @Override public void OnUpdateTrafficFacility(AMapNaviTrafficFacilityInfo aMapNaviTrafficFacilityInfo) {}
     @Override public void updateAimlessModeStatistics(AimLessModeStat aimLessModeStat) {}
     @Override public void updateAimlessModeCongestionInfo(AimLessModeCongestionInfo aimLessModeCongestionInfo) {}
     @Override public void onPlayRing(int i) {}
-    @Override public void onGpsSignalWeak(boolean b) {}
+
+    // **实现导航语音捕获 - 重载方法1**
+    @Override
+    public void onGetNavigationText(int type, String naviText) {
+        Log.d("NavigationActivity", "导航语音 (type=" + type + "): " + naviText);
+        handleNavigationVoice(naviText);
+    }
+
+    // **实现导航语音捕获 - 重载方法2**
+    @Override
+    public void onGetNavigationText(String naviText) {
+        Log.d("NavigationActivity", "导航语音: " + naviText);
+        handleNavigationVoice(naviText);
+    }
+
+    @Override
+    public void onGpsSignalWeak(boolean isWeak) {
+        // **添加阶段控制：只有在导航阶段才提示GPS信号问题**
+        if (isWeak && currentPhase == NavigationPhase.NAVIGATION_STARTED) {
+            Log.d("NavigationActivity", "GPS信号较弱，当前阶段: " + currentPhase);
+            patrickAI.patrickSpeak("GPS信号较弱，请注意路况");
+        } else if (isWeak) {
+            Log.d("NavigationActivity", "GPS信号较弱，但当前阶段不是导航中，忽略提示: " + currentPhase);
+        }
+    }
+
     @Override public void onInitNaviFailure() {}
     @Override public void onInitNaviSuccess() {}
     @Override public void onStartNavi(int i) {}
     @Override public void onTrafficStatusUpdate() {}
     @Override public void onLocationChange(AMapNaviLocation aMapNaviLocation) {}
-    @Override public void onGetNavigationText(int i, String s) {}
-    @Override public void onGetNavigationText(String s) {}
     @Override public void onEndEmulatorNavi() {}
-    @Override public void onArriveDestination() {}
+
+    @Override
+    public void onArriveDestination() {
+        // **重置为空闲状态**
+        currentPhase = NavigationPhase.IDLE;
+
+        // 清空导航语音队列
+        naviVoiceQueue.clear();
+        patrickAI.patrickSpeak("已到达目的地，导航结束，祝你愉快");
+    }
+
     @Override public void onCalculateRouteFailure(int i) {}
     @Override public void onReCalculateRouteForYaw() {}
-    @Override public void onReCalculateRouteForTrafficJam() {}
+
+    @Override
+    public void onReCalculateRouteForTrafficJam() {
+        // 只有在导航阶段才提示重新规划
+        if (currentPhase == NavigationPhase.NAVIGATION_STARTED) {
+            Log.d("NavigationActivity", "检测到拥堵，重新规划路线，当前阶段: " + currentPhase);
+            patrickAI.patrickSpeak("检测到前方拥堵，正在重新规划路线");
+        } else {
+            Log.d("NavigationActivity", "检测到拥堵，但当前阶段不是导航中，忽略: " + currentPhase);
+        }
+    }
     @Override public void onArrivedWayPoint(int i) {}
     @Override public void onGpsOpenStatus(boolean b) {}
     @Override public void onNaviInfoUpdate(NaviInfo naviInfo) {}
@@ -472,4 +888,62 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     @Override public void showLaneInfo(AMapLaneInfo[] aMapLaneInfos, byte[] bytes, byte[] bytes1) {}
     @Override public void showLaneInfo(AMapLaneInfo aMapLaneInfo) {}
     @Override public void hideLaneInfo() {}
+
+    // **处理导航语音播报 - 增加阶段控制**
+    private void handleNavigationVoice(String naviText) {
+        if (naviText == null || naviText.trim().isEmpty()) return;
+
+        Log.d("NavigationActivity", "处理导航语音: " + naviText + ", 当前阶段: " + currentPhase);
+
+        // **关键修改：只有在导航已开始阶段才播放导航语音**
+        if (currentPhase != NavigationPhase.NAVIGATION_STARTED) {
+            Log.d("NavigationActivity", "当前阶段不允许导航语音播报，忽略: " + naviText);
+            return;
+        }
+
+        if (isPatrickSpeaking) {
+            // Patrick正在说话，将导航语音加入队列
+            Log.d("NavigationActivity", "Patrick正在说话，导航语音排队: " + naviText);
+            naviVoiceQueue.offer(naviText);
+        } else {
+            // 立即播放导航语音
+            playNavigationVoice(naviText);
+        }
+    }
+
+    // **播放导航语音**
+    private void playNavigationVoice(String naviText) {
+        isNaviSpeaking = true;
+
+        // 暂停Patrick AI监听，避免把导航语音识别为用户输入
+        if (patrickAI != null) {
+            patrickAI.pauseListening();
+        }
+
+        Log.d("NavigationActivity", "播放导航语音: " + naviText);
+
+        // 使用Patrick的TTS播放导航指令，但用特殊的语调/前缀标识
+        patrickAI.patrickSpeak("导航提示：" + naviText);
+
+        // 估算播放时长
+        int speakDuration = Math.max(3000, naviText.length() * 120); // 导航语音通常较短，给更多时间
+
+        // 导航语音结束后的处理
+        ttsHandler.postDelayed(() -> {
+            isNaviSpeaking = false;
+
+            // 恢复Patrick监听
+            if (patrickAI != null) {
+                patrickAI.resumeListening();
+            }
+
+            // 播放队列中的下一个导航语音
+            if (!naviVoiceQueue.isEmpty()) {
+                String nextNaviText = naviVoiceQueue.poll();
+                Log.d("NavigationActivity", "播放队列中的导航语音: " + nextNaviText);
+                playNavigationVoice(nextNaviText);
+            }
+
+        }, speakDuration + 500); // 多等500ms确保完全结束
+    }
 }
