@@ -56,6 +56,9 @@ public class AIChatActivity extends AppCompatActivity {
 
         apiClient = new GLMApiClient();
 
+        // 初始化TTS
+        TTSPlayer.init(this);
+
         // 权限检查
         if (!checkAudioPermission()) requestAudioPermission();
         else initSpeechRecognizer();
@@ -159,15 +162,19 @@ public class AIChatActivity extends AppCompatActivity {
             btnSend.setEnabled(false);
             scrollToBottom();
 
-            // 本地处理“导航”或“视频”关键词
+            // 本地处理"导航"或"视频"关键词
             if (userText.contains("导航")) {
-                tvChat.append("AI: 我好像听到你提到了导航，要打开导航模式吗？\n");
+                String aiReply = "我好像听到你提到了导航，要打开导航模式吗？";
+                tvChat.append("AI: " + aiReply + "\n");
+                TTSPlayer.speak(aiReply);
                 awaitingNavigationConfirm = true;
                 btnSend.setEnabled(true);
                 scrollToBottom();
                 return;
             } else if (userText.contains("视频")) {
-                tvChat.append("AI: 我好像听到你提到了视频，要打开视频模式吗？\n");
+                String aiReply = "我好像听到你提到了视频，要打开视频模式吗？";
+                tvChat.append("AI: " + aiReply + "\n");
+                TTSPlayer.speak(aiReply);
                 awaitingVideoConfirm = true;
                 btnSend.setEnabled(true);
                 scrollToBottom();
@@ -180,7 +187,9 @@ public class AIChatActivity extends AppCompatActivity {
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
                     e.printStackTrace();
                     runOnUiThread(() -> {
-                        tvChat.append("AI: 网络错误\n");
+                        String errorMsg = "网络错误";
+                        tvChat.append("AI: " + errorMsg + "\n");
+                        TTSPlayer.speak(errorMsg);
                         btnSend.setEnabled(true);
                         scrollToBottom();
                     });
@@ -194,15 +203,22 @@ public class AIChatActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             if (content != null && !content.trim().isEmpty()) {
                                 tvChat.append("AI: " + content + "\n");
+                                TTSPlayer.speak(content);
                                 handleAIIntent(content);
-                            } else tvChat.append("AI: 暂无回复内容\n");
+                            } else {
+                                String noReplyMsg = "暂无回复内容";
+                                tvChat.append("AI: " + noReplyMsg + "\n");
+                                TTSPlayer.speak(noReplyMsg);
+                            }
 
                             btnSend.setEnabled(true);
                             scrollToBottom();
                         });
                     } catch (Exception e) {
                         runOnUiThread(() -> {
-                            tvChat.append("AI: 回复解析失败\n");
+                            String errorMsg = "回复解析失败";
+                            tvChat.append("AI: " + errorMsg + "\n");
+                            TTSPlayer.speak(errorMsg);
                             btnSend.setEnabled(true);
                             scrollToBottom();
                         });
@@ -249,7 +265,7 @@ public class AIChatActivity extends AppCompatActivity {
         }
         if (awaitingVideoConfirm) {
             if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")) {
-                startActivity(new Intent(this, VideoActivity.class));
+                startActivity(new Intent(this, VideoActivity_pi.class));
             }
             awaitingVideoConfirm = false;
         }
@@ -259,5 +275,7 @@ public class AIChatActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (mIat != null) { mIat.cancel(); mIat.destroy(); }
+        // 清理TTS资源
+        TTSPlayer.shutdown();
     }
 }
