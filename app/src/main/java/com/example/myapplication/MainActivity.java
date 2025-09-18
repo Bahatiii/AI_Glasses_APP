@@ -1,6 +1,7 @@
 package com.example.myapplication;
 
 import android.os.Bundle;
+import android.os.Handler;
 import android.widget.Button;
 import android.widget.Toast;
 import android.content.Intent;
@@ -46,11 +47,16 @@ public class MainActivity extends AppCompatActivity {
 
         // 点击导航模式按钮
         btnNavigation.setOnClickListener(view -> {
-            Toast.makeText(this, "进入导航模式", Toast.LENGTH_SHORT).show();
-            Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
-            startActivity(intent);
+                    Toast.makeText(this, "进入导航模式", Toast.LENGTH_SHORT).show();
+                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
                 }
         );
 
+        // 延迟2秒后自动进入AI模式
+        new Handler().postDelayed(() -> {
+            Toast.makeText(this, "自动进入AI模式", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, AIChatActivity.class);
+            startActivity(intent);
+        }, 1000); // 2秒延迟
     }
 }

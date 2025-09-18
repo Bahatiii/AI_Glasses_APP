@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.MotionEvent;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
@@ -65,6 +66,19 @@ public class AIChatActivity extends AppCompatActivity {
 
         setupVoiceButton();
         setupSendButton();
+
+        // 延迟1.5秒后主动问候，确保TTS初始化完成
+        new Handler().postDelayed(() -> {
+            showPatrickGreeting();
+        }, 1500);
+    }
+
+    // Patrick主动问候
+    private void showPatrickGreeting() {
+        String greeting = "你好，我是Patrick，你的智能AI眼镜助手";
+        tvChat.append("Patrick: " + greeting + "\n");
+        TTSPlayer.speak(greeting);
+        scrollToBottom();
     }
 
     // --- 权限 ---
@@ -122,9 +136,7 @@ public class AIChatActivity extends AppCompatActivity {
         }
         @Override public void onBeginOfSpeech() {}
         @Override public void onEndOfSpeech() {}
-        @Override public void onError(SpeechError error) {
-            Toast.makeText(AIChatActivity.this, "语音识别错误: " + error.getPlainDescription(true), Toast.LENGTH_SHORT).show();
-        }
+        @Override public void onError(SpeechError error) { Toast.makeText(AIChatActivity.this, "语音识别错误: " + error.getPlainDescription(true), Toast.LENGTH_SHORT).show(); }
         @Override public void onVolumeChanged(int volume, byte[] data) {}
         @Override public void onEvent(int eventType, int arg1, int arg2, Bundle obj) {}
     };
@@ -148,6 +160,7 @@ public class AIChatActivity extends AppCompatActivity {
         });
     }
 
+
     // --- 文本发送按钮 ---
     private void setupSendButton() {
         btnSend.setOnClickListener(v -> {
@@ -166,7 +179,7 @@ public class AIChatActivity extends AppCompatActivity {
             // 本地处理"导航"或"视频"关键词
             if (userText.contains("导航")) {
                 String aiReply = "我好像听到你提到了导航，要打开导航模式吗？";
-                tvChat.append("AI: " + aiReply + "\n");
+                tvChat.append("Patrick: " + aiReply + "\n");
                 TTSPlayer.speak(aiReply);
                 awaitingNavigationConfirm = true;
                 btnSend.setEnabled(true);
@@ -174,7 +187,7 @@ public class AIChatActivity extends AppCompatActivity {
                 return;
             } else if (userText.contains("视频")) {
                 String aiReply = "我好像听到你提到了视频，要打开视频模式吗？";
-                tvChat.append("AI: " + aiReply + "\n");
+                tvChat.append("Patrick: " + aiReply + "\n");
                 TTSPlayer.speak(aiReply);
                 awaitingVideoConfirm = true;
                 btnSend.setEnabled(true);
@@ -182,15 +195,17 @@ public class AIChatActivity extends AppCompatActivity {
                 return;
             }
 
+            // 修改prompt让AI以Patrick身份回复
+            String promptWithPersonality = "你是Patrick，一个智能AI眼镜助手。请以Patrick的身份回复用户的问题。用户问题：" + userText;
 
             // 其他内容走接口
-            apiClient.chatCompletion(userText, new Callback() {
+            apiClient.chatCompletion(promptWithPersonality, new Callback() {
                 @Override
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
                     e.printStackTrace();
                     runOnUiThread(() -> {
-                        String errorMsg = "网络错误";
-                        tvChat.append("AI: " + errorMsg + "\n");
+                        String errorMsg = "Patrick遇到了网络问题，请稍后再试";
+                        tvChat.append("Patrick: " + errorMsg + "\n");
                         TTSPlayer.speak(errorMsg);
                         btnSend.setEnabled(true);
                         scrollToBottom();
@@ -204,12 +219,12 @@ public class AIChatActivity extends AppCompatActivity {
                         String content = GLMResponseParser.parseContent(resp);
                         runOnUiThread(() -> {
                             if (content != null && !content.trim().isEmpty()) {
-                                tvChat.append("AI: " + content + "\n");
+                                tvChat.append("Patrick: " + content + "\n");
                                 TTSPlayer.speak(content);
                                 handleAIIntent(content);
                             } else {
-                                String noReplyMsg = "暂无回复内容";
-                                tvChat.append("AI: " + noReplyMsg + "\n");
+                                String noReplyMsg = "Patrick暂时无法理解，请重新说一遍";
+                                tvChat.append("Patrick: " + noReplyMsg + "\n");
                                 TTSPlayer.speak(noReplyMsg);
                             }
 
@@ -218,8 +233,8 @@ public class AIChatActivity extends AppCompatActivity {
                         });
                     } catch (Exception e) {
                         runOnUiThread(() -> {
-                            String errorMsg = "回复解析失败";
-                            tvChat.append("AI: " + errorMsg + "\n");
+                            String errorMsg = "Patrick处理回复时出现问题";
+                            tvChat.append("Patrick: " + errorMsg + "\n");
                             TTSPlayer.speak(errorMsg);
                             btnSend.setEnabled(true);
                             scrollToBottom();
@@ -266,12 +281,10 @@ public class AIChatActivity extends AppCompatActivity {
             return;
         }
         if (awaitingVideoConfirm) {
-            if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")
-                    || reply.contains("行") || reply.contains("没问题") || reply.contains("打开视频")) {
-                startActivity(new Intent(this, VideoActivity_pi.class));  // ✅ 改为 VideoActivity_pi
+            if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")) {
+                startActivity(new Intent(this, VideoActivity_pi.class));
             }
             awaitingVideoConfirm = false;
-            return;
         }
     }
 
