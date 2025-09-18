@@ -550,7 +550,7 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                     Tip firstTip = currentSearchResults.get(currentAskingIndex);
                     patrickAI.patrickSpeak("你要去" + firstTip.getName() + "吗？");
                 }
-            }, 1000);
+            }, 500);
         }
     }
 
@@ -705,7 +705,9 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         if (!mAMapNavi.calculateWalkRoute(mStartLatLng, mEndLatLng)) {
             Toast.makeText(this, "路径规划失败", Toast.LENGTH_SHORT).show();
         } else {
-            patrickAI.patrickSpeak("开始为你导航，请注意路况安全");
+            // **移除这里的语音播报，避免与onCalculateRouteSuccess重复**
+            // patrickAI.patrickSpeak("开始为你导航，请注意路况安全");
+            Log.d("NavigationActivity", "开始路线规划");
         }
     }
 
@@ -794,7 +796,9 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 currentPhase = NavigationPhase.NAVIGATION_STARTED;
 
                 Log.d("NavigationActivity", "路线规划成功，进入导航阶段: " + currentPhase);
-                patrickAI.patrickSpeak("路线规划成功，导航已开始，我会为你播报路况");
+
+                // **只在这里播报一次导航开始，与高德的导航语音区分开**
+                patrickAI.patrickSpeak("路线规划成功，导航开始");
             } else {
                 // **重置为空闲状态**
                 currentPhase = NavigationPhase.IDLE;
@@ -889,9 +893,22 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     @Override public void showLaneInfo(AMapLaneInfo aMapLaneInfo) {}
     @Override public void hideLaneInfo() {}
 
-    // **处理导航语音播报 - 增加阶段控制**
+    // **新增：防止重复处理同一条导航语音**
+    private String lastNaviText = "";
+    private long lastNaviTextTime = 0;
+
+    // **处理导航语音播报 - 增加阶段控制和去重**
     private void handleNavigationVoice(String naviText) {
         if (naviText == null || naviText.trim().isEmpty()) return;
+
+        // **新增：去重机制 - 防止同一条语音被重复处理**
+        long currentTime = System.currentTimeMillis();
+        if (naviText.equals(lastNaviText) && (currentTime - lastNaviTextTime) < 1000) {
+            Log.d("NavigationActivity", "重复的导航语音，忽略: " + naviText);
+            return;
+        }
+        lastNaviText = naviText;
+        lastNaviTextTime = currentTime;
 
         Log.d("NavigationActivity", "处理导航语音: " + naviText + ", 当前阶段: " + currentPhase);
 

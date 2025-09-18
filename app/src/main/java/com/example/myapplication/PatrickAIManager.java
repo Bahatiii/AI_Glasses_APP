@@ -234,7 +234,7 @@ public class PatrickAIManager {
                 Log.d("PatrickAI", "导航相关输入处理完毕，恢复监听");
                 isEnabled = true;
                 resumeListening();
-            }, 1000);
+            }, 800);
             return;
         }
 
