@@ -119,7 +119,9 @@ public class AIChatActivity extends AppCompatActivity {
         }
         @Override public void onBeginOfSpeech() {}
         @Override public void onEndOfSpeech() {}
-        @Override public void onError(SpeechError error) { Toast.makeText(AIChatActivity.this, "语音识别错误: " + error.getPlainDescription(true), Toast.LENGTH_SHORT).show(); }
+        @Override public void onError(SpeechError error) {
+            Toast.makeText(AIChatActivity.this, "语音识别错误: " + error.getPlainDescription(true), Toast.LENGTH_SHORT).show();
+        }
         @Override public void onVolumeChanged(int volume, byte[] data) {}
         @Override public void onEvent(int eventType, int arg1, int arg2, Bundle obj) {}
     };
@@ -142,7 +144,6 @@ public class AIChatActivity extends AppCompatActivity {
             return false;
         });
     }
-
 
     // --- 文本发送按钮 ---
     private void setupSendButton() {
@@ -174,6 +175,7 @@ public class AIChatActivity extends AppCompatActivity {
                 return;
             }
 
+
             // 其他内容走接口
             apiClient.chatCompletion(userText, new Callback() {
                 @Override
@@ -194,7 +196,7 @@ public class AIChatActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             if (content != null && !content.trim().isEmpty()) {
                                 tvChat.append("AI: " + content + "\n");
-                                handleAIIntent(content);
+                                handleAIIntent(content);  // 保留意图解析
                             } else tvChat.append("AI: 暂无回复内容\n");
 
                             btnSend.setEnabled(true);
@@ -248,10 +250,12 @@ public class AIChatActivity extends AppCompatActivity {
             return;
         }
         if (awaitingVideoConfirm) {
-            if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")) {
-                startActivity(new Intent(this, VideoActivity.class));
+            if (reply.contains("是") || reply.contains("好的") || reply.contains("确定") || reply.contains("可以")
+                    || reply.contains("行") || reply.contains("没问题") || reply.contains("打开视频")) {
+                startActivity(new Intent(this, VideoActivity_pi.class));  // ✅ 改为 VideoActivity_pi
             }
             awaitingVideoConfirm = false;
+            return;
         }
     }
 
