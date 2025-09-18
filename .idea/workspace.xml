@@ -31,8 +31,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="修改了图片识别的bug">
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="换了个Patrick皮肤">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -43,7 +42,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=D:\androidavd\.android\avd\Pixel.avd)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=IJSS855DGEORXK95)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -286,7 +285,23 @@
       <option name="project" value="LOCAL" />
       <updated>1758200505359</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="换了个Patrick皮肤">
+      <option name="closed" value="true" />
+      <created>1758201737667</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1758201737667</updated>
+    </task>
+    <task id="LOCAL-00013" summary="换了个Patrick皮肤">
+      <option name="closed" value="true" />
+      <created>1758202110703</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1758202110703</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -301,7 +316,8 @@
     <MESSAGE value="删除了无关文件，给AI加入语音识别" />
     <MESSAGE value="路线绘制" />
     <MESSAGE value="修改了图片识别的bug" />
-    <option name="LAST_COMMIT_MESSAGE" value="修改了图片识别的bug" />
+    <MESSAGE value="换了个Patrick皮肤" />
+    <option name="LAST_COMMIT_MESSAGE" value="换了个Patrick皮肤" />
   </component>
   <component name="play_dynamic_filters_status">
     <option name="appIdToCheckInfo">
