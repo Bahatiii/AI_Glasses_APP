@@ -15,10 +15,10 @@ public class BaiduImageUploader {
     private static final String TAG = "BaiduUploader";
 
     // ✅ 直接使用你提供的 access_token
-    private static final String ACCESS_TOKEN = "24.7a191e2f85426b39d51528f4894010c4.2592000.1755269716.282335-119528581";
+    private static final String ACCESS_TOKEN = "24.5449951b38fd692d9d667ae87d6fa949.2592000.1760790930.282335-119528581";
 
     // 百度图像识别 API（通用物体识别）
-    private static final String API_URL = "https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic\n";
+    private static final String API_URL = "https://aip.baidubce.com/rest/2.0/ocr/v1/accurate";
     /**
      * 上传 bitmap 图像并识别
      */

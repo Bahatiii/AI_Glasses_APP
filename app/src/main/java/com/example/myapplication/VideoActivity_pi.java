@@ -426,47 +426,72 @@ public class VideoActivity_pi extends AppCompatActivity {
             return;
         }
 
+        // ✅ 截取 WebView 的画面
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         webView.draw(canvas);
 
         Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
 
+        // ✅ 调用百度 OCR 上传
         BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
             @Override
             public void onSuccess(String resultJson) {
                 runOnUiThread(() -> {
                     try {
                         JSONObject json = new JSONObject(resultJson);
-                        JSONArray wordsArray = json.getJSONArray("words_result");
-                        if (wordsArray.length() > 0) {
-                            StringBuilder sb = new StringBuilder();
-                            for (int i = 0; i < wordsArray.length(); i++) {
-                                JSONObject obj = wordsArray.getJSONObject(i);
-                                String word = obj.getString("words");
-                                sb.append(word);
-                                if (i < wordsArray.length() - 1) {
-                                    sb.append("，");
+
+                        StringBuilder sb = new StringBuilder();
+
+                        if (json.has("words_result")) {
+                            JSONArray wordsArray = json.getJSONArray("words_result");
+                            if (wordsArray.length() > 0) {
+                                for (int i = 0; i < wordsArray.length(); i++) {
+                                    JSONObject obj = wordsArray.getJSONObject(i);
+                                    sb.append(obj.getString("words"));
+                                    if (i < wordsArray.length() - 1) sb.append("，");
                                 }
+                            } else {
+                                sb.append("未识别到文字");
                             }
-                            String sentence = sb.toString();
-                            Toast.makeText(VideoActivity_pi.this, sentence, Toast.LENGTH_LONG).show();
-                            TTSPlayer.speak(sentence);
-                        } else {
-                            TTSPlayer.speak("识别失败，没有识别到文字");
                         }
+                        // 如果没有 words_result，尝试读取 result（通用物体识别返回字段）
+                        else if (json.has("result")) {
+                            JSONArray resultArray = json.getJSONArray("result");
+                            if (resultArray.length() > 0) {
+                                for (int i = 0; i < resultArray.length(); i++) {
+                                    JSONObject obj = resultArray.getJSONObject(i);
+                                    sb.append(obj.getString("keyword"));
+                                    if (i < resultArray.length() - 1) sb.append("，");
+                                }
+                            } else {
+                                sb.append("未识别到物体");
+                            }
+                        }
+                        else {
+                            sb.append("未识别到可用结果");
+                        }
+
+                        String sentence = sb.toString();
+                        Toast.makeText(VideoActivity_pi.this, sentence, Toast.LENGTH_LONG).show();
+                        TTSPlayer.speak(sentence);
+
                     } catch (Exception e) {
                         Toast.makeText(VideoActivity_pi.this, "解析出错：" + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 });
             }
 
+
             @Override
             public void onError(String errorMessage) {
                 runOnUiThread(() -> {
-                    Toast.makeText(VideoActivity_pi.this, "上传失败：" + errorMessage, Toast.LENGTH_LONG).show();
+                    Toast.makeText(VideoActivity_pi.this,
+                            "上传失败：" + errorMessage,
+                            Toast.LENGTH_LONG).show();
                 });
             }
         });
     }
+
 }
