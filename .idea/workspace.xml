@@ -33,6 +33,9 @@
   <component name="ChangeListManager">
     <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="换了个Patrick皮肤">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/PatrickAIManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/PatrickAIManager.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/TTSPlayer.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/TTSPlayer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_ai_chat.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_ai_chat.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -42,7 +45,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=IJSS855DGEORXK95)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=L7P6R21A14000492)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -334,7 +337,7 @@
         </entry>
         <entry key="com.example.myapplication">
           <value>
-            <CheckInfo lastCheckTimestamp="1758195977156" />
+            <CheckInfo lastCheckTimestamp="1758339202130" />
           </value>
         </entry>
         <entry key="com.example.myapplication.core.test">
@@ -344,7 +347,7 @@
         </entry>
         <entry key="com.example.myapplication.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1758195977156" />
+            <CheckInfo lastCheckTimestamp="1758339202130" />
           </value>
         </entry>
         <entry key="com.example.myapplication.uiasr.test">

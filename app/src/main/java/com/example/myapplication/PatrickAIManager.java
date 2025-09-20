@@ -42,6 +42,7 @@ public class PatrickAIManager {
     private boolean isSpeaking = false;
     private Handler thinkingHandler = new Handler(Looper.getMainLooper());
     private Runnable thinkingRunnable;
+    private android.media.AudioManager audioManager;
 
     // 回调接口
     public interface PatrickCallback {
@@ -59,6 +60,12 @@ public class PatrickAIManager {
         this.apiClient = new GLMApiClient();
         initSpeechRecognizer();
         TTSPlayer.init(this.context);
+        try {
+            audioManager = (android.media.AudioManager) this.context.getSystemService(Context.AUDIO_SERVICE);
+        } catch (Exception e) {
+            Log.w("PatrickAI", "audioManager init failed: " + e.getMessage());
+            audioManager = null;
+        }
     }
 
     public static PatrickAIManager getInstance(Context context) {
@@ -134,15 +141,38 @@ public class PatrickAIManager {
             public void run() {
                 if (isThinking) {
                     isSpeaking = true;
+                    // register a TTS listener to keep recognizer paused during thinking TTS
+                    TTSPlayer.registerListener(new com.example.myapplication.TTSPlayer.TTSListener() {
+                        @Override
+                        public void onTtsStart(String utteranceId) {
+                            Log.d("PatrickAI", "thinking TTS started: " + utteranceId);
+                            forceStopListening();
+                            muteMic();
+                        }
+
+                        @Override
+                        public void onTtsDone(String utteranceId) {
+                            Log.d("PatrickAI", "thinking TTS done: " + utteranceId);
+                            isSpeaking = false;
+                            unmuteMic();
+                            TTSPlayer.unregisterListener();
+                        }
+
+                        @Override
+                        public void onTtsError(String utteranceId) {
+                            Log.d("PatrickAI", "thinking TTS error: " + utteranceId);
+                            isSpeaking = false;
+                            unmuteMic();
+                            TTSPlayer.unregisterListener();
+                        }
+                    });
+
                     TTSPlayer.speak("Patrick智商不高，正在思考");
                     if (callback != null) {
                         callback.onPatrickSpeak("Patrick智商不高，正在思考");
                     }
                     thinkingHandler.postDelayed(this, 4000);
 
-                    mainHandler.postDelayed(() -> {
-                        isSpeaking = false;
-                    }, 2000);
                 }
             }
         };
@@ -164,6 +194,33 @@ public class PatrickAIManager {
         if (speechRecognizer != null && isListening) {
             speechRecognizer.cancel();
             isListening = false;
+        }
+    }
+
+    // 静音/取消静音麦克风，防止 TTS 被识别
+    private void muteMic() {
+        try {
+            if (audioManager != null) {
+                audioManager.setMicrophoneMute(true);
+                Log.d("PatrickAI", "mic muted");
+            } else {
+                Log.w("PatrickAI", "audioManager is null, cannot mute mic");
+            }
+        } catch (Exception e) {
+            Log.w("PatrickAI", "muteMic failed: " + e.getMessage());
+        }
+    }
+
+    private void unmuteMic() {
+        try {
+            if (audioManager != null) {
+                audioManager.setMicrophoneMute(false);
+                Log.d("PatrickAI", "mic unmuted");
+            } else {
+                Log.w("PatrickAI", "audioManager is null, cannot unmute mic");
+            }
+        } catch (Exception e) {
+            Log.w("PatrickAI", "unmuteMic failed: " + e.getMessage());
         }
     }
 
@@ -241,25 +298,55 @@ public class PatrickAIManager {
 
         // **以下只在非导航模式下执行**
 
-        // 处理确认状态
+        // 处理确认状态 —— 使用 AI 判断用户输入是否表示同意（异步）
         if (awaitingNavigationConfirm) {
-            Log.d("PatrickAI", "处理导航确认状态，用户输入: " + userText);
-            if (userText.contains("是") || userText.contains("好的") || userText.contains("确定") ||
-                    userText.contains("可以") || userText.contains("是的") || userText.contains("嗯") ||
-                    userText.contains("行") || userText.contains("OK") || userText.contains("可以的") ||
-                    userText.contains("没错")) {
-                Log.d("PatrickAI", "确认导航请求");
-                String reply = "好的，我来为你打开导航模式";
-                speakAndCallback(reply);
-                if (callback != null) {
-                    callback.onNavigationRequest();
+            Log.d("PatrickAI", "处理导航确认状态（交给 AI 判断），用户输入: " + userText);
+
+            String judgePrompt = "你是一个判断器，只判断用户的回复是否表示同意打开导航。\n用户回复：\"" + userText + "\"\n如果表示同意，严格只输出 YES；如果不表示同意或不确定，严格只输出 NO。不要输出其他内容或解释。";
+
+            apiClient.chatCompletion(judgePrompt, new Callback() {
+                @Override
+                public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                    Log.e("PatrickAI", "AI判断失败: " + e.getMessage());
+                    // 失败时退回到保守策略：询问用户或继续聊天
+                    String reply = "抱歉，我没听清你的回答，请再说一遍。";
+                    speakAndCallback(reply);
+                    awaitingNavigationConfirm = false;
                 }
-            } else {
-                Log.d("PatrickAI", "拒绝导航请求");
-                String reply = "好的，那我们继续聊天吧";
-                speakAndCallback(reply);
-            }
-            awaitingNavigationConfirm = false;
+
+                @Override
+                public void onResponse(@NotNull Call call, @NotNull Response response) {
+                    try {
+                        String resp = response.body() != null ? response.body().string() : "";
+                        Log.d("PatrickAI", "AI判断原始回复: " + resp);
+                        String lower = resp.toLowerCase();
+                        boolean agree = false;
+                        if (lower.contains("yes") || lower.contains("y") || lower.contains("同意") || lower.contains("是")) {
+                            agree = true;
+                        }
+
+                        if (agree) {
+                            Log.d("PatrickAI", "AI判断为同意，执行导航");
+                            String reply = "好的，我来为你打开导航模式";
+                            speakAndCallback(reply);
+                            if (callback != null) {
+                                callback.onNavigationRequest();
+                            }
+                        } else {
+                            Log.d("PatrickAI", "AI判断为不同意或不确定，取消导航");
+                            String reply = "好的，那我们继续聊天吧";
+                            speakAndCallback(reply);
+                        }
+                    } catch (Exception ex) {
+                        Log.e("PatrickAI", "解析 AI 判断回复失败: " + ex.getMessage());
+                        String reply = "抱歉，处理你的回答时出错，请再说一遍。";
+                        speakAndCallback(reply);
+                    } finally {
+                        awaitingNavigationConfirm = false;
+                    }
+                }
+            });
+
             return;
         }
 
@@ -456,24 +543,46 @@ public class PatrickAIManager {
         isSpeaking = true;
         forceStopListening();
 
+        // Register a TTS listener to reliably pause/resume recognizer during TTS playback
+        TTSPlayer.registerListener(new com.example.myapplication.TTSPlayer.TTSListener() {
+            @Override
+            public void onTtsStart(String utteranceId) {
+                Log.d("PatrickAI", "TTS started: " + utteranceId);
+                // ensure recognizer is stopped while TTS plays
+                forceStopListening();
+                muteMic();
+            }
+
+            @Override
+            public void onTtsDone(String utteranceId) {
+                Log.d("PatrickAI", "TTS done: " + utteranceId);
+                isSpeaking = false;
+                isEnabled = true;
+                unmuteMic();
+                TTSPlayer.unregisterListener();
+                mainHandler.postDelayed(() -> {
+                    if (!isThinking && !isSpeaking) startContinuousListening();
+                }, 400);
+            }
+
+            @Override
+            public void onTtsError(String utteranceId) {
+                Log.d("PatrickAI", "TTS error: " + utteranceId);
+                isSpeaking = false;
+                isEnabled = true;
+                unmuteMic();
+                TTSPlayer.unregisterListener();
+                mainHandler.postDelayed(() -> {
+                    if (!isThinking && !isSpeaking) startContinuousListening();
+                }, 400);
+            }
+        });
+
         mainHandler.post(() -> {
             TTSPlayer.speak(text);
             if (callback != null) {
                 callback.onPatrickSpeak(text);
             }
-
-            int speakDuration = Math.max(2000, text.length() * 100);
-
-            mainHandler.postDelayed(() -> {
-                isSpeaking = false;
-                isEnabled = true;
-
-                mainHandler.postDelayed(() -> {
-                    if (!isThinking && !isSpeaking) {
-                        startContinuousListening();
-                    }
-                }, 500);
-            }, speakDuration);
         });
     }
 
@@ -509,6 +618,12 @@ public class PatrickAIManager {
             speechRecognizer.destroy();
         }
         TTSPlayer.shutdown();
+        // ensure mic state restored
+        try {
+            unmuteMic();
+        } catch (Exception e) {
+            Log.w("PatrickAI", "unmute on destroy failed: " + e.getMessage());
+        }
         instance = null;
     }
 }
