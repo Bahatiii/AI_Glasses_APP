@@ -7,7 +7,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.*;
-
+import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -49,10 +49,20 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
 
         setupSendButton();
 
-        // 延迟1.5秒后主动问候
-        new Handler().postDelayed(() -> {
-            showPatrickGreeting();
-        }, 1500);
+        // **修改：检查是否从导航返回，如果是则不播放问候语**
+        boolean isFromNavigation = getIntent().getBooleanExtra("from_navigation", false);
+        if (!isFromNavigation) {
+            // 延迟1.5秒后主动问候
+            new Handler().postDelayed(() -> {
+                showPatrickGreeting();
+            }, 1500);
+        } else {
+            // 从导航返回，显示简短的确认信息
+            new Handler().postDelayed(() -> {
+                tvChat.append("已返回AI聊天模式\n");
+                scrollToBottom();
+            }, 500);
+        }
     }
 
     private void startPatrickAI() {
@@ -77,6 +87,7 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
         runOnUiThread(() -> {
             tvChat.append("Patrick: " + text + "\n");
             scrollToBottom();
+            Log.d("AIChatActivity", "Patrick说话显示在对话框: " + text);
         });
     }
 
@@ -149,9 +160,12 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     @Override
     protected void onResume() {
         super.onResume();
+        Log.d("AIChatActivity", "onResume - 重新设置Patrick回调");
         if (patrickAI != null) {
+            // **关键修改：确保回调正确设置**
             patrickAI.setCallback(this);
             patrickAI.resumeListening();
+            Log.d("AIChatActivity", "Patrick回调已重新设置为AIChatActivity");
         }
     }
 
@@ -169,6 +183,22 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
         // 不销毁PatrickAI，让它在其他Activity中继续工作
         if (patrickAI != null) {
             patrickAI.setCallback(null);
+        }
+    }
+
+    // **新增：处理从其他Activity返回时的Intent**
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+
+        // 检查是否从导航返回
+        boolean isFromNavigation = intent.getBooleanExtra("from_navigation", false);
+        if (isFromNavigation) {
+            runOnUiThread(() -> {
+                tvChat.append("已返回AI聊天模式\n");
+                scrollToBottom();
+            });
         }
     }
 }

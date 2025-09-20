@@ -215,6 +215,7 @@ public class PatrickAIManager {
         Log.d("PatrickAI", "当前状态 - awaitingNavigationConfirm: " + awaitingNavigationConfirm);
         Log.d("PatrickAI", "当前状态 - awaitingVideoConfirm: " + awaitingVideoConfirm);
 
+        // **关键修改1：先调用callback，让NavigationActivity有机会处理**
         if (callback != null) {
             Log.d("PatrickAI", "调用callback.onUserSpeak: " + userText);
             callback.onUserSpeak(userText);
@@ -226,17 +227,19 @@ public class PatrickAIManager {
         forceStopListening();
         isEnabled = false;
 
-        // **关键修改：在导航模式下，如果是导航相关输入或确认词，直接返回让NavigationActivity处理**
-        if (isInNavigationMode() && (isNavigationRelatedInput(userText) || isConfirmationWord(userText))) {
-            Log.d("PatrickAI", "导航模式下的导航相关输入或确认词，交给NavigationActivity处理: " + userText);
-            // 不调用AI处理，直接恢复监听
+        // **关键修改2：在导航模式下，优先让NavigationActivity处理所有输入，缩短等待时间**
+        if (isInNavigationMode()) {
+            Log.d("PatrickAI", "导航模式下，优先交给NavigationActivity处理，PatrickAI不干预");
+            // 不调用AI处理，缩短等待时间
             mainHandler.postDelayed(() -> {
                 Log.d("PatrickAI", "导航相关输入处理完毕，恢复监听");
                 isEnabled = true;
                 resumeListening();
-            }, 800);
+            }, 600); // **从800缩短到600ms**
             return;
         }
+
+        // **以下只在非导航模式下执行**
 
         // 处理确认状态
         if (awaitingNavigationConfirm) {
@@ -282,14 +285,12 @@ public class PatrickAIManager {
         }
 
         // 本地关键词识别（只在非导航模式下触发模式切换）
-        if (!isInNavigationMode()) {
-            if (userText.contains("导航") || userText.contains("地图") || userText.contains("路线")) {
-                Log.d("PatrickAI", "检测到导航关键词，询问确认");
-                String reply = "我听到你提到了导航，要打开导航模式吗？";
-                speakAndCallback(reply);
-                awaitingNavigationConfirm = true;
-                return;
-            }
+        if (userText.contains("导航") || userText.contains("地图") || userText.contains("路线")) {
+            Log.d("PatrickAI", "检测到导航关键词，询问确认");
+            String reply = "我听到你提到了导航，要打开导航模式吗？";
+            speakAndCallback(reply);
+            awaitingNavigationConfirm = true;
+            return;
         }
 
         if (userText.contains("视频") || userText.contains("摄像") || userText.contains("拍摄")) {

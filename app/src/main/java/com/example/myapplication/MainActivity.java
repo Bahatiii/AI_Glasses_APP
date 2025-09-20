@@ -47,10 +47,10 @@ public class MainActivity extends AppCompatActivity {
 
         // 点击导航模式按钮
         btnNavigation.setOnClickListener(view -> {
-                    Toast.makeText(this, "进入导航模式", Toast.LENGTH_SHORT).show();
-                    Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
-                }
-        );
+            Toast.makeText(this, "进入导航模式", Toast.LENGTH_SHORT).show();
+            Intent intent = new Intent(MainActivity.this, NavigationActivity.class);
+            startActivity(intent);
+        });
 
         // 延迟2秒后自动进入AI模式
         new Handler().postDelayed(() -> {
