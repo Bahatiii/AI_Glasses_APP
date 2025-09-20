@@ -31,6 +31,16 @@ public class PatrickAIManager {
     private static final int MIN_TEXT_LENGTH = 1;
     private long speechStartTime = 0;
 
+    // 扩充的确认/拒绝词库（可根据需要继续扩展）
+    private static final String[] POSITIVE_CONFIRMATIONS = new String[] {
+        "是", "好的", "确定", "可以", "是的", "嗯", "行", "OK", "可以的", "没错",
+        "好", "去吧", "开始", "走", "马上", "就去", "好的，去", "去吧，帮我导航","要"
+    };
+
+    private static final String[] NEGATIVE_CONFIRMATIONS = new String[] {
+        "不", "不要", "别", "不用", "取消", "算了", "不需要", "不用了", "不行"
+    };
+
     // 确认状态
     private boolean awaitingNavigationConfirm = false;
     private boolean awaitingVideoConfirm = false;
@@ -51,6 +61,85 @@ public class PatrickAIManager {
     }
 
     private PatrickCallback callback;
+
+    // Pending deliveries when UI callback is temporarily null
+    private final java.util.List<String> pendingPatrickMessages = new java.util.ArrayList<>();
+    private final java.util.List<String> pendingUserMessages = new java.util.ArrayList<>();
+    private boolean pendingNavigationRequest = false;
+    private boolean pendingVideoRequest = false;
+
+    // Safe callback dispatch helpers to ensure UI thread delivery
+    private void deliverPatrickSpeakToCallback(String text) {
+        if (callback != null) {
+            try { callback.onPatrickSpeak(text); } catch (Exception e) { Log.w("PatrickAI", "deliverPatrickSpeak failed: " + e.getMessage()); }
+        } else {
+            Log.w("PatrickAI", "deliverPatrickSpeak: callback is null");
+        }
+    }
+
+    private void notifyPatrickSpeak(String text) {
+        if (callback == null) {
+            synchronized (pendingPatrickMessages) { pendingPatrickMessages.add(text); }
+            Log.d("PatrickAI", "notifyPatrickSpeak: queued message as callback is null");
+            return;
+        }
+        if (mainHandler != null) mainHandler.post(() -> deliverPatrickSpeakToCallback(text));
+        else deliverPatrickSpeakToCallback(text);
+    }
+
+    private void deliverUserSpeakToCallback(String text) {
+        if (callback != null) {
+            try { callback.onUserSpeak(text); } catch (Exception e) { Log.w("PatrickAI", "deliverUserSpeak failed: " + e.getMessage()); }
+        } else {
+            Log.w("PatrickAI", "deliverUserSpeak: callback is null");
+        }
+    }
+
+    private void notifyUserSpeak(String text) {
+        if (callback == null) {
+            synchronized (pendingUserMessages) { pendingUserMessages.add(text); }
+            Log.d("PatrickAI", "notifyUserSpeak: queued user message as callback is null");
+            return;
+        }
+        if (mainHandler != null) mainHandler.post(() -> deliverUserSpeakToCallback(text));
+        else deliverUserSpeakToCallback(text);
+    }
+
+    private void deliverNavigationRequestToCallback() {
+        if (callback != null) {
+            try { callback.onNavigationRequest(); } catch (Exception e) { Log.w("PatrickAI", "deliverNavigationRequest failed: " + e.getMessage()); }
+        } else {
+            Log.w("PatrickAI", "deliverNavigationRequest: callback is null");
+        }
+    }
+
+    private void notifyNavigationRequest() {
+        if (callback == null) {
+            pendingNavigationRequest = true;
+            Log.d("PatrickAI", "notifyNavigationRequest: queued navigation request as callback is null");
+            return;
+        }
+        if (mainHandler != null) mainHandler.post(this::deliverNavigationRequestToCallback);
+        else deliverNavigationRequestToCallback();
+    }
+
+    private void deliverVideoRequestToCallback() {
+        if (callback != null) {
+            try { callback.onVideoRequest(); } catch (Exception e) { Log.w("PatrickAI", "deliverVideoRequest failed: " + e.getMessage()); }
+        } else {
+            Log.w("PatrickAI", "deliverVideoRequest: callback is null");
+        }
+    }
+
+    private void notifyVideoRequest() {
+        if (callback == null) {
+            pendingVideoRequest = true;
+            Log.d("PatrickAI", "notifyVideoRequest: queued video request as callback is null");
+            return;
+        }
+        if (mainHandler != null) mainHandler.post(this::deliverVideoRequestToCallback);
+        else deliverVideoRequestToCallback();
+    }
 
     private PatrickAIManager(Context context) {
         this.context = context.getApplicationContext();
@@ -75,6 +164,96 @@ public class PatrickAIManager {
 
     public void setCallback(PatrickCallback callback) {
         this.callback = callback;
+        // If a UI callback was just attached, flush any pending messages/requests
+        if (this.callback != null) {
+            Log.d("PatrickAI", "setCallback: flushing pending messages/requests");
+            // flush Patrick messages on main thread
+            if (mainHandler != null) {
+                mainHandler.post(() -> {
+                    synchronized (pendingPatrickMessages) {
+                        for (String msg : pendingPatrickMessages) {
+                            try { callback.onPatrickSpeak(msg); } catch (Exception e) { Log.w("PatrickAI", "flushPatrickSpeak failed: " + e.getMessage()); }
+                        }
+                        pendingPatrickMessages.clear();
+                    }
+
+                    synchronized (pendingUserMessages) {
+                        for (String u : pendingUserMessages) {
+                            try { callback.onUserSpeak(u); } catch (Exception e) { Log.w("PatrickAI", "flushUserSpeak failed: " + e.getMessage()); }
+                        }
+                        pendingUserMessages.clear();
+                    }
+
+                    if (pendingNavigationRequest) {
+                        try { callback.onNavigationRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushNavigation failed: " + e.getMessage()); }
+                        pendingNavigationRequest = false;
+                    }
+                    if (pendingVideoRequest) {
+                        try { callback.onVideoRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushVideo failed: " + e.getMessage()); }
+                        pendingVideoRequest = false;
+                    }
+                });
+            } else {
+                synchronized (pendingPatrickMessages) {
+                    for (String msg : pendingPatrickMessages) {
+                        try { callback.onPatrickSpeak(msg); } catch (Exception e) { Log.w("PatrickAI", "flushPatrickSpeak failed: " + e.getMessage()); }
+                    }
+                    pendingPatrickMessages.clear();
+                }
+                synchronized (pendingUserMessages) {
+                    for (String u : pendingUserMessages) {
+                        try { callback.onUserSpeak(u); } catch (Exception e) { Log.w("PatrickAI", "flushUserSpeak failed: " + e.getMessage()); }
+                    }
+                    pendingUserMessages.clear();
+                }
+                if (pendingNavigationRequest) {
+                    try { callback.onNavigationRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushNavigation failed: " + e.getMessage()); }
+                    pendingNavigationRequest = false;
+                }
+                if (pendingVideoRequest) {
+                    try { callback.onVideoRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushVideo failed: " + e.getMessage()); }
+                    pendingVideoRequest = false;
+                }
+            }
+        }
+    }
+
+    /**
+     * 立即（如果在主线程）或尽快将 pending 队列刷新到当前 callback 上。
+     * 在 Activity 恢复/返回时可调用以保证 UI 立刻收到未显示的信息。
+     */
+    public void flushPendingToCallback() {
+        if (this.callback == null) return;
+        Runnable flush = () -> {
+            synchronized (pendingPatrickMessages) {
+                for (String msg : pendingPatrickMessages) {
+                    try { callback.onPatrickSpeak(msg); } catch (Exception e) { Log.w("PatrickAI", "flushPatrickSpeak failed: " + e.getMessage()); }
+                }
+                pendingPatrickMessages.clear();
+            }
+            synchronized (pendingUserMessages) {
+                for (String u : pendingUserMessages) {
+                    try { callback.onUserSpeak(u); } catch (Exception e) { Log.w("PatrickAI", "flushUserSpeak failed: " + e.getMessage()); }
+                }
+                pendingUserMessages.clear();
+            }
+            if (pendingNavigationRequest) {
+                try { callback.onNavigationRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushNavigation failed: " + e.getMessage()); }
+                pendingNavigationRequest = false;
+            }
+            if (pendingVideoRequest) {
+                try { callback.onVideoRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushVideo failed: " + e.getMessage()); }
+                pendingVideoRequest = false;
+            }
+        };
+
+        // 始终通过 mainHandler 异步投递到主线程以确保 UI 完成当前生命周期/渲染操作后再刷新
+        if (mainHandler != null) {
+            mainHandler.post(flush);
+        } else {
+            // 如果没有 mainHandler（极少见），回退到直接执行
+            flush.run();
+        }
     }
 
     private void initSpeechRecognizer() {
@@ -166,9 +345,8 @@ public class PatrickAIManager {
                     });
 
                     TTSPlayer.speak("Patrick智商不高，正在思考");
-                    if (callback != null) {
-                        callback.onPatrickSpeak("Patrick智商不高，正在思考");
-                    }
+                    // 始终调用 notify，内部会在 callback 为 null 时排队消息，防止返回后消息丢失
+                    notifyPatrickSpeak("Patrick智商不高，正在思考");
                     thinkingHandler.postDelayed(this, 4000);
 
                 }
@@ -270,13 +448,9 @@ public class PatrickAIManager {
         Log.d("PatrickAI", "当前状态 - awaitingNavigationConfirm: " + awaitingNavigationConfirm);
         Log.d("PatrickAI", "当前状态 - awaitingVideoConfirm: " + awaitingVideoConfirm);
 
-        // **关键修改1：先调用callback，让NavigationActivity有机会处理**
-        if (callback != null) {
-            Log.d("PatrickAI", "调用callback.onUserSpeak: " + userText);
-            callback.onUserSpeak(userText);
-        } else {
-            Log.w("PatrickAI", "callback为null，无法调用onUserSpeak");
-        }
+        // **关键修改1：先尝试发送用户说话事件，让UI有机会展示或处理（若callback为null会排队）**
+        Log.d("PatrickAI", "调用notifyUserSpeak (或排队): " + userText);
+        notifyUserSpeak(userText);
 
         // 立即停止语音识别
         forceStopListening();
@@ -296,76 +470,127 @@ public class PatrickAIManager {
 
         // **以下只在非导航模式下执行**
 
-        // 处理确认状态 —— 使用 AI 判断用户输入是否表示同意（异步）
+        // 处理确认状态 —— 使用扩充的关键词库做同步判断（立即跳转）
         if (awaitingNavigationConfirm) {
-            Log.d("PatrickAI", "处理导航确认状态（交给 AI 判断），用户输入: " + userText);
+            Log.d("PatrickAI", "处理导航确认状态（关键词判断），用户输入: " + userText);
+            boolean agree = false;
+            boolean reject = false;
+            for (String p : POSITIVE_CONFIRMATIONS) {
+                if (userText.contains(p)) { agree = true; break; }
+            }
+            for (String n : NEGATIVE_CONFIRMATIONS) {
+                if (userText.contains(n)) { reject = true; break; }
+            }
 
-            String judgePrompt = "你是一个判断器，只判断用户的回复是否表示同意打开导航。\n用户回复：\"" + userText + "\"\n如果表示同意，严格只输出 YES；如果不表示同意或不确定，严格只输出 NO。不要输出其他内容或解释。";
+            if (agree && !reject) {
+                Log.d("PatrickAI", "确认导航请求 (keywords)");
+                String reply = "好的，我来为你打开导航模式";
+                speakAndCallback(reply);
+                // 直接notify，内部会在callback为null时进行排队
+                notifyNavigationRequest();
+            } else if (reject && !agree) {
+                Log.d("PatrickAI", "拒绝导航请求 (keywords)");
+                String reply = "好的，那我们继续聊天吧";
+                speakAndCallback(reply);
+            } else {
+                Log.d("PatrickAI", "未能从关键词判断出明确意图，默认执行导航");
+                // 如果既没有明显拒绝也没有明显同意，为了更好体验直接跳转（按你要求直接跳转）
+                String reply = "好的，我来为你打开导航模式";
+                speakAndCallback(reply);
+                // 直接notify，内部会在callback为null时进行排队
+                notifyNavigationRequest();
+            }
 
-            apiClient.chatCompletion(judgePrompt, new Callback() {
-                @Override
-                public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                    Log.e("PatrickAI", "AI判断失败: " + e.getMessage());
-                    // 失败时退回到保守策略：询问用户或继续聊天
-                    String reply = "抱歉，我没听清你的回答，请再说一遍。";
-                    speakAndCallback(reply);
-                    awaitingNavigationConfirm = false;
-                }
-
-                @Override
-                public void onResponse(@NotNull Call call, @NotNull Response response) {
-                    try {
-                        String resp = response.body() != null ? response.body().string() : "";
-                        Log.d("PatrickAI", "AI判断原始回复: " + resp);
-                        String lower = resp.toLowerCase();
-                        boolean agree = false;
-                        if (lower.contains("yes") || lower.contains("y") || lower.contains("同意") || lower.contains("是")) {
-                            agree = true;
-                        }
-
-                        if (agree) {
-                            Log.d("PatrickAI", "AI判断为同意，执行导航");
-                            String reply = "好的，我来为你打开导航模式";
-                            speakAndCallback(reply);
-                            if (callback != null) {
-                                callback.onNavigationRequest();
-                            }
-                        } else {
-                            Log.d("PatrickAI", "AI判断为不同意或不确定，取消导航");
-                            String reply = "好的，那我们继续聊天吧";
-                            speakAndCallback(reply);
-                        }
-                    } catch (Exception ex) {
-                        Log.e("PatrickAI", "解析 AI 判断回复失败: " + ex.getMessage());
-                        String reply = "抱歉，处理你的回答时出错，请再说一遍。";
-                        speakAndCallback(reply);
-                    } finally {
-                        awaitingNavigationConfirm = false;
-                    }
-                }
-            });
-
+            awaitingNavigationConfirm = false;
             return;
         }
 
         if (awaitingVideoConfirm) {
-            Log.d("PatrickAI", "处理视频确认状态，用户输入: " + userText);
-            if (userText.contains("是") || userText.contains("好的") || userText.contains("确定") ||
+            Log.d("PatrickAI", "处理视频确认状态（快速判断+AI备用），用户输入: " + userText);
+            boolean quickAgreeV = userText.contains("是") || userText.contains("好的") || userText.contains("确定") ||
                     userText.contains("可以") || userText.contains("是的") || userText.contains("嗯") ||
                     userText.contains("行") || userText.contains("OK") || userText.contains("可以的") ||
-                    userText.contains("没错")) {
-                Log.d("PatrickAI", "确认视频请求");
+                    userText.contains("没错")||userText.contains("要")||userText.contains("对");
+            boolean quickRejectV = userText.contains("不") || userText.contains("不要") || userText.contains("别") || userText.contains("不用");
+            if (quickAgreeV) {
+                Log.d("PatrickAI", "确认视频请求 (quickAgree)");
                 String reply = "好的，我来为你打开视频模式";
                 speakAndCallback(reply);
-                if (callback != null) {
-                    callback.onVideoRequest();
-                }
-            } else {
-                Log.d("PatrickAI", "拒绝视频请求");
+                // 直接notify，内部会在callback为null时进行排队
+                notifyVideoRequest();
+                awaitingVideoConfirm = false;
+                return;
+            } else if (quickRejectV) {
+                Log.d("PatrickAI", "拒绝视频请求 (quickReject)");
                 String reply = "好的，那我们继续聊天吧";
                 speakAndCallback(reply);
+                awaitingVideoConfirm = false;
+                return;
             }
+
+            String judgePromptV = "你是一个判断器，只判断用户的回复是否表示同意打开视频模式。用户回复：\"" + userText + "\" 如果表示同意，输出 YES；否则输出 NO。不要输出其他内容。";
             awaitingVideoConfirm = false;
+            final boolean[] aiRespondedV = {false};
+            final Runnable vidFallback = () -> {
+                if (!aiRespondedV[0]) {
+                    Log.d("PatrickAI", "AI视频确认超时，使用关键词回退判断");
+                    boolean agree = userText.contains("是") || userText.contains("好的") || userText.contains("确定") ||
+                            userText.contains("可以") || userText.contains("是的") || userText.contains("嗯") ||
+                            userText.contains("行") || userText.contains("OK") || userText.contains("可以的") ||
+                            userText.contains("没错");
+                    if (agree) {
+                        Log.d("PatrickAI", "确认视频请求 (timeout-fallback)");
+                        String reply = "好的，我来为你打开视频模式";
+                        speakAndCallback(reply);
+                        // 直接notify，内部会在callback为null时进行排队
+                        notifyVideoRequest();
+                    } else {
+                        Log.d("PatrickAI", "拒绝视频请求 (timeout-fallback)");
+                        String reply = "好的，那我们继续聊天吧";
+                        speakAndCallback(reply);
+                    }
+                }
+            };
+            mainHandler.postDelayed(vidFallback, 800);
+
+            apiClient.chatCompletion(judgePromptV, new Callback() {
+                @Override
+                public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                    aiRespondedV[0] = true;
+                    mainHandler.removeCallbacks(vidFallback);
+                    Log.e("PatrickAI", "视频确认判定AI请求失败，回退到关键词判断: " + e.getMessage());
+                    String reply = "抱歉，我没听清你的回答，请再说一遍。";
+                    speakAndCallback(reply);
+                }
+
+                @Override
+                public void onResponse(@NotNull Call call, @NotNull Response response) {
+                    aiRespondedV[0] = true;
+                    mainHandler.removeCallbacks(vidFallback);
+                    try {
+                        String resp = response.body() != null ? response.body().string() : "";
+                        Log.d("PatrickAI", "AI视频判断原始回复: " + resp);
+                        String lower = resp.toLowerCase();
+                        boolean agree = lower.contains("yes") || lower.contains("y") || lower.contains("同意") || lower.contains("是");
+                        if (agree) {
+                            Log.d("PatrickAI", "AI判断为同意，执行视频");
+                            String reply = "好的，我来为你打开视频模式";
+                            speakAndCallback(reply);
+                            // 直接notify，内部会在callback为null时进行排队
+                            notifyVideoRequest();
+                        } else {
+                            Log.d("PatrickAI", "AI判断为不同意或不确定，取消视频");
+                            String reply = "好的，那我们继续聊天吧";
+                            speakAndCallback(reply);
+                        }
+                    } catch (Exception ex) {
+                        Log.e("PatrickAI", "解析 AI 视频判断回复失败: " + ex.getMessage());
+                        String reply = "抱歉，处理你的回答时出错，请再说一遍。";
+                        speakAndCallback(reply);
+                    }
+                }
+            });
+
             return;
         }
 
@@ -386,135 +611,77 @@ public class PatrickAIManager {
             return;
         }
 
-        Log.d("PatrickAI", "开始AI思考处理");
-        // 开始思考提示
-        startThinkingPrompt();
-
-        // 其他问题发送给AI
-        String prompt = "你是Patrick，一个智能AI眼镜助手。请简洁地回复用户的问题，回复不要超过30字。用户问题：" + userText;
-
-        apiClient.chatCompletion(prompt, new Callback() {
-            @Override
-            public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                Log.e("PatrickAI", "AI请求失败: " + e.getMessage());
-                stopThinkingPrompt();
-                String errorMsg = "我遇到了一些问题，请稍后再试";
-                speakAndCallback(errorMsg);
+        if (awaitingVideoConfirm) {
+            Log.d("PatrickAI", "处理视频确认状态（关键词判断），用户输入: " + userText);
+            boolean agreeV = false;
+            boolean rejectV = false;
+            for (String p : POSITIVE_CONFIRMATIONS) {
+                if (userText.contains(p)) { agreeV = true; break; }
+            }
+            for (String n : NEGATIVE_CONFIRMATIONS) {
+                if (userText.contains(n)) { rejectV = true; break; }
             }
 
-            @Override
-            public void onResponse(@NotNull Call call, @NotNull Response response) {
-                Log.d("PatrickAI", "AI请求成功");
-                stopThinkingPrompt();
-                try {
-                    String resp = response.body() != null ? response.body().string() : "";
-                    Log.d("PatrickAI", "AI原始回复: " + resp);
-                    String content = parseAIResponse(resp);
-                    Log.d("PatrickAI", "AI解析后内容: " + content);
-                    String replyText = content != null && !content.trim().isEmpty() ?
-                            content : "我暂时无法理解你的意思";
-                    speakAndCallback(replyText);
-                } catch (Exception e) {
-                    Log.e("PatrickAI", "AI回复解析失败: " + e.getMessage());
-                    String errorMsg = "处理回复时出现问题";
-                    speakAndCallback(errorMsg);
-                }
+            if (agreeV && !rejectV) {
+                Log.d("PatrickAI", "确认视频请求 (keywords)");
+                String reply = "好的，我来为你打开视频模式";
+                speakAndCallback(reply);
+                // 直接notify，内部会在callback为null时进行排队
+                notifyVideoRequest();
+            } else if (rejectV && !agreeV) {
+                Log.d("PatrickAI", "拒绝视频请求 (keywords)");
+                String reply = "好的，那我们继续聊天吧";
+                speakAndCallback(reply);
+            } else {
+                Log.d("PatrickAI", "未能从关键词判断出明确意图，默认执行视频" );
+                String reply = "好的，我来为你打开视频模式";
+                speakAndCallback(reply);
+                // 直接notify，内部会在callback为null时进行排队
+                notifyVideoRequest();
             }
-        });
+
+            awaitingVideoConfirm = false;
+            return;
+        }
+
     }
 
-    // 判断是否是确认类的短语音
-    private boolean isConfirmationWord(String text) {
-        Log.d("PatrickAI", "判断是否确认词: " + text);
-        String[] confirmWords = {"是", "是的", "好的", "确定", "可以", "对", "嗯", "行", "OK", "没错", "可以的"};
-        String[] rejectWords = {"不", "不是", "不对", "错", "不是的", "错了", "下一个", "换一个"};
-
-        for (String word : confirmWords) {
-            if (text.contains(word)) {
-                Log.d("PatrickAI", "匹配到确认词: " + word);
-                return true;
-            }
-        }
-        for (String word : rejectWords) {
-            if (text.contains(word)) {
-                Log.d("PatrickAI", "匹配到拒绝词: " + word);
-                return true;
-            }
-        }
-        Log.d("PatrickAI", "不是确认/拒绝词");
-        return false;
-    }
-
-    private final RecognizerListener recognizerListener = new RecognizerListener() {
-        @Override
-        public void onBeginOfSpeech() {
-            speechStartTime = System.currentTimeMillis();
-            Log.d("PatrickAI", "检测到开始说话");
-        }
-
+    private RecognizerListener recognizerListener = new RecognizerListener() {
         @Override
         public void onResult(RecognizerResult results, boolean isLast) {
-            String text = results.getResultString();
-            long speechDuration = System.currentTimeMillis() - speechStartTime;
+            String text = "";
+            try {
+                text = results != null && results.getResultString() != null ? results.getResultString() : "";
+            } catch (Exception e) {
+                Log.w("PatrickAI", "解析识别结果失败: " + e.getMessage());
+                text = "";
+            }
 
-            Log.d("PatrickAI", "=== 语音识别结果 ===");
-            Log.d("PatrickAI", "原始识别结果: '" + text + "'");
-            Log.d("PatrickAI", "语音时长: " + speechDuration + "ms");
-            Log.d("PatrickAI", "文本长度: " + (text != null ? text.length() : 0));
-            Log.d("PatrickAI", "isLast: " + isLast);
-
-            // 对于确认类词汇，放宽过滤条件
-            boolean isConfirmation = isConfirmationWord(text);
-            int minLength = isConfirmation ? 300 : MIN_SPEECH_LENGTH; // 确认词最少300ms
-            int minTextLen = isConfirmation ? 1 : MIN_TEXT_LENGTH; // 确认词最少1个字符
-
-            Log.d("PatrickAI", "isConfirmation: " + isConfirmation);
-            Log.d("PatrickAI", "minLength: " + minLength);
-            Log.d("PatrickAI", "minTextLen: " + minTextLen);
-
-            // 加强过滤条件，但对确认词放宽
-            if (text != null && !text.trim().isEmpty() &&
-                    speechDuration > minLength &&
-                    text.length() >= minTextLen &&
-                    (isConfirmation || !text.matches(".*[啊呀哦嗯嗯呢噢].*"))) {
-                Log.d("PatrickAI", "✓ 语音通过过滤，准备处理: " + text + (isConfirmation ? " (确认词)" : ""));
-                handleUserInput(text);
-            } else {
-                Log.d("PatrickAI", "✗ 语音被过滤: " + text);
-                Log.d("PatrickAI", "过滤原因 - 时长:" + speechDuration + "ms(需要>" + minLength + "), 长度:" +
-                        (text != null ? text.length() : 0) + "(需要>=" + minTextLen + ")");
-                if (isLast && isEnabled && !isThinking && !isSpeaking) {
-                    Log.d("PatrickAI", "重新开始监听");
-                    mainHandler.postDelayed(() -> {
-                        if (isEnabled && !isThinking && !isSpeaking) {
-                            startContinuousListening();
-                        }
-                    }, 1000);
+            // 简化处理：当是最终结果时转给 handleUserInput（由 handleUserInput 内部决定后续逻辑）
+            if (isLast) {
+                if (!text.trim().isEmpty()) {
+                    handleUserInput(text);
+                } else {
+                    if (isEnabled && !isThinking && !isSpeaking) {
+                        mainHandler.postDelayed(() -> startContinuousListening(), 1000);
+                    }
                 }
             }
         }
 
         @Override
         public void onError(SpeechError error) {
-            Log.e("PatrickAI", "语音识别错误: " + error.getPlainDescription(true) + " 错误码: " + error.getErrorCode());
+            Log.e("PatrickAI", "语音识别错误: " + (error != null ? error.getPlainDescription(true) + " 错误码: " + error.getErrorCode() : "null"));
 
-            if (error.getErrorCode() == 10118) {
+            if (error != null && error.getErrorCode() == 10118) {
                 Log.d("PatrickAI", "未检测到语音，重新开始监听");
                 if (isEnabled && !isThinking && !isSpeaking) {
-                    mainHandler.postDelayed(() -> {
-                        if (isEnabled && !isThinking && !isSpeaking) {
-                            startContinuousListening();
-                        }
-                    }, 1000);
+                    mainHandler.postDelayed(() -> startContinuousListening(), 1000);
                 }
             } else {
                 Log.d("PatrickAI", "其他错误，延迟重新监听");
                 if (isEnabled && !isThinking && !isSpeaking) {
-                    mainHandler.postDelayed(() -> {
-                        if (isEnabled && !isThinking && !isSpeaking) {
-                            startContinuousListening();
-                        }
-                    }, 3000);
+                    mainHandler.postDelayed(() -> startContinuousListening(), 3000);
                 }
             }
         }
@@ -524,6 +691,12 @@ public class PatrickAIManager {
             if (volume > MIN_VOLUME_THRESHOLD) {
                 Log.d("PatrickAI", "检测到有效音量变化: " + volume);
             }
+        }
+
+        @Override
+        public void onBeginOfSpeech() {
+            speechStartTime = System.currentTimeMillis();
+            Log.d("PatrickAI", "语音开始");
         }
 
         @Override
@@ -578,9 +751,8 @@ public class PatrickAIManager {
 
         mainHandler.post(() -> {
             TTSPlayer.speak(text);
-            if (callback != null) {
-                callback.onPatrickSpeak(text);
-            }
+            // 无条件通知，内部会在 callback 为 null 时排队消息
+            notifyPatrickSpeak(text);
         });
     }
 
