@@ -18,8 +18,6 @@ import java.util.Arrays;
 public class AIChatActivity extends AppCompatActivity implements PatrickAIManager.PatrickCallback {
 
     private static final int AUDIO_PERMISSION_REQUEST_CODE = 2001;
-    private static final int REQUEST_NAVIGATION = 3001;
-    private static final int REQUEST_VIDEO = 3002;
 
     private EditText etInput;
     private Button btnSend;
@@ -27,8 +25,6 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     private ScrollView scrollChat;
 
     private PatrickAIManager patrickAI;
-    // 当从子 Activity（导航/视频）返回时，使用此标志避免 onResume 重复立即 resumeListening
-    private boolean suppressAutoResumeOnNextResume = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,11 +49,15 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
 
         setupSendButton();
 
-        // **只在首次进入时问候**
+        // **修改：检查是否从导航返回，如果是则不播放问候语**
         boolean isFromNavigation = getIntent().getBooleanExtra("from_navigation", false);
         if (!isFromNavigation) {
-            new Handler().postDelayed(this::showPatrickGreeting, 1500);
+            // 延迟1.5秒后主动问候
+            new Handler().postDelayed(() -> {
+                showPatrickGreeting();
+            }, 1500);
         } else {
+            // 从导航返回，显示简短的确认信息
             new Handler().postDelayed(() -> {
                 tvChat.append("已返回AI聊天模式\n");
                 scrollToBottom();
@@ -74,12 +74,11 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     private void showPatrickGreeting() {
         String greeting = "你好，我是Patrick，你的智能AI眼镜助手，我现在开始监听你的语音";
         tvChat.append("Patrick: " + greeting + "\n");
-        if (patrickAI != null) {
-            patrickAI.patrickSpeak(greeting);
-        } else {
-            TTSPlayer.speak(greeting);
-        }
+        patrickAI.pauseListening(); // 暂停监听避免自己说话被识别
+        TTSPlayer.speak(greeting);
         scrollToBottom();
+        // 3秒后恢复监听
+        new Handler().postDelayed(() -> patrickAI.resumeListening(), 3000);
     }
 
     // --- Patrick回调接口实现 ---
@@ -104,7 +103,7 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     public void onNavigationRequest() {
         runOnUiThread(() -> {
             Intent intent = new Intent(this, NavigationActivity.class);
-            startActivityForResult(intent, REQUEST_NAVIGATION);
+            startActivity(intent);
         });
     }
 
@@ -112,27 +111,8 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     public void onVideoRequest() {
         runOnUiThread(() -> {
             Intent intent = new Intent(this, VideoActivity_pi.class);
-            startActivityForResult(intent, REQUEST_VIDEO);
+            startActivity(intent);
         });
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_NAVIGATION || requestCode == REQUEST_VIDEO) {
-            runOnUiThread(() -> {
-                tvChat.append("已返回AI聊天模式\n");
-                scrollToBottom();
-                if (patrickAI != null) {
-                    patrickAI.setCallback(this);
-                    patrickAI.flushPendingToCallback();
-                    ensureUiRefresh();
-                    patrickAI.pauseListening();
-                    suppressAutoResumeOnNextResume = true;
-                    // ❌ 删除重复的 showPatrickGreeting();
-                }
-            });
-        }
     }
 
     // --- 权限 ---
@@ -156,7 +136,7 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
         }
     }
 
-    // --- 文本发送按钮 ---
+    // --- 文本发送按钮（保留手动输入功能） ---
     private void setupSendButton() {
         btnSend.setOnClickListener(v -> {
             InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
@@ -182,14 +162,9 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
         super.onResume();
         Log.d("AIChatActivity", "onResume - 重新设置Patrick回调");
         if (patrickAI != null) {
+            // **关键修改：确保回调正确设置**
             patrickAI.setCallback(this);
-            patrickAI.flushPendingToCallback();
-            ensureUiRefresh();
-            if (!suppressAutoResumeOnNextResume) {
-                patrickAI.resumeListening();
-            } else {
-                suppressAutoResumeOnNextResume = false;
-            }
+            patrickAI.resumeListening();
             Log.d("AIChatActivity", "Patrick回调已重新设置为AIChatActivity");
         }
     }
@@ -205,48 +180,25 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        // 不销毁PatrickAI，让它在其他Activity中继续工作
         if (patrickAI != null) {
             patrickAI.setCallback(null);
         }
     }
 
+    // **新增：处理从其他Activity返回时的Intent**
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
 
+        // 检查是否从导航返回
         boolean isFromNavigation = intent.getBooleanExtra("from_navigation", false);
         if (isFromNavigation) {
             runOnUiThread(() -> {
                 tvChat.append("已返回AI聊天模式\n");
                 scrollToBottom();
-                if (patrickAI != null) {
-                    patrickAI.setCallback(this);
-                    patrickAI.flushPendingToCallback();
-                    ensureUiRefresh();
-                    patrickAI.pauseListening();
-                    suppressAutoResumeOnNextResume = true;
-                    // ❌ 删除重复的 showPatrickGreeting();
-                }
             });
-        }
-    }
-
-    // 强制刷新聊天视图并滚动到底部
-    private void ensureUiRefresh() {
-        try {
-            if (tvChat != null) {
-                tvChat.post(() -> {
-                    tvChat.requestLayout();
-                    tvChat.invalidate();
-                    scrollToBottom();
-                });
-            }
-            if (getWindow() != null && getWindow().getDecorView() != null) {
-                getWindow().getDecorView().post(() -> getWindow().getDecorView().invalidate());
-            }
-        } catch (Exception e) {
-            Log.w("AIChatActivity", "ensureUiRefresh failed: " + e.getMessage());
         }
     }
 }
