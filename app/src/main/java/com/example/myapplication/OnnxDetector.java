@@ -2,7 +2,6 @@ package com.example.myapplication;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.util.Log;
 import android.speech.tts.TextToSpeech;
 
@@ -152,19 +151,18 @@ public class OnnxDetector {
         } catch (Exception e) {
             Log.e(TAG, "❌ 推理出错", e);
             return null;
-
-
         }
 
         if (allDetectedClasses.isEmpty()) return null;
 
-        StringBuilder sb = new StringBuilder();
-        for (String cls : allDetectedClasses) sb.append(cls).append("，");
-        sb.setLength(sb.length() - 1);
+        // 转换为播报内容
+        String speechText = mapToSpeech(allDetectedClasses);
 
-        String result = sb.toString();
-        maybeSpeak(result);
-        return result;
+        if (speechText != null && !speechText.isEmpty()) {
+            maybeSpeak(speechText);
+        }
+
+        return speechText;
     }
 
     private Set<String> parseOutput(float[][][] outputArray, boolean isLightModel) {
@@ -206,6 +204,27 @@ public class OnnxDetector {
             case 4: return "自行车";
             default: return null;
         }
+    }
+
+    // 将检测结果映射为播报文字
+    private String mapToSpeech(Set<String> detected) {
+        if (detected.contains("人行横道")) {
+            return "前方人行横道";
+        }
+        if (detected.contains("红灯")) {
+            return "现在是红灯";
+        }
+        if (detected.contains("绿灯")) {
+            return "现在是绿灯";
+        }
+        // 只要检测到任何车辆类，就统一播报“前方有来车”
+        for (String cls : detected) {
+            if (cls.equals("小汽车") || cls.equals("卡车") || cls.equals("公交车")
+                    || cls.equals("摩托车") || cls.equals("自行车")) {
+                return "前方有来车";
+            }
+        }
+        return null;
     }
 
     private void speak(String text) {
