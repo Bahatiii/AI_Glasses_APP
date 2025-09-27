@@ -6,9 +6,10 @@ import android.os.Looper;
 import android.view.View;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.webkit.WebSettings;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -20,40 +21,40 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-import android.webkit.WebResourceResponse;
+
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.HttpURLConnection;
 import java.net.InetAddress;
+import java.net.URL;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
-import com.example.myapplication.TTSPlayer;
 
 public class VideoActivity_pi extends AppCompatActivity {
+
     private WebView webView;
     private TextView tvStatus;
     private ProgressBar progressBar;
     private Button btnRetry;
     private Button btnCapture;
-
     private static final int TIMEOUT_MS = 5000;
     private static final int MAX_RETRY_COUNT = 3;
-
     private ExecutorService executor;
     private Handler mainHandler;
     private int retryCount = 0;
     private OnnxDetector onnxDetector;
 
-    // UDP相关 - 树莓派
     private volatile String raspiIp = null;
     private DatagramSocket udpSocket;
     private Thread udpDiscoverThread;
+
     private final int AUTO_DETECT_INTERVAL_MS = 1000;
     private final Handler detectHandler = new Handler(Looper.getMainLooper());
     private final Runnable detectRunnable = new Runnable() {
@@ -64,29 +65,12 @@ public class VideoActivity_pi extends AppCompatActivity {
         }
     };
 
-    private void autoDetectFrame() {
-        if (webView.getWidth() == 0 || webView.getHeight() == 0) {
-            return;
-        }
-        Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        webView.draw(canvas);
-
-        executor.execute(() -> {
-            String result = onnxDetector.detect(bitmap);
-            if (result != null && !result.isEmpty()) {
-                mainHandler.post(() -> {
-                    TTSPlayer.speak("前方检测到：" + result);
-                });
-            }
-        });
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_video);
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
@@ -96,15 +80,23 @@ public class VideoActivity_pi extends AppCompatActivity {
         initViews();
         setupWebView();
         setupBackPressedCallback();
-        TTSPlayer.init(this);
-        onnxDetector = new OnnxDetector(this);
+
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
+
+        // 初始化 OnnxDetector
+        onnxDetector = new OnnxDetector(this);
+        if (onnxDetector != null && onnxDetector.isModelLoaded()) {
+            tvStatus.setText("模型加载成功 ✅");
+            Log.d("VideoActivity_pi", "OnnxDetector 初始化成功");
+        } else {
+            tvStatus.setText("模型加载失败 ❌");
+            Log.e("VideoActivity_pi", "OnnxDetector 初始化失败");
+        }
 
         // 启动树莓派发现
         discoverRaspberryPi();
 
-        btnCapture = findViewById(R.id.btn_capture);
         btnCapture.setOnClickListener(v -> captureAndUploadFrame());
     }
 
@@ -113,6 +105,7 @@ public class VideoActivity_pi extends AppCompatActivity {
         tvStatus = findViewById(R.id.tv_status);
         progressBar = findViewById(R.id.progress_bar);
         btnRetry = findViewById(R.id.btn_retry);
+        btnCapture = findViewById(R.id.btn_capture);
 
         btnRetry.setOnClickListener(v -> {
             retryCount = 0;
@@ -130,57 +123,26 @@ public class VideoActivity_pi extends AppCompatActivity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
-        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
 
+        webView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                return false;
-            }
-
-            @Override
-            public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                super.onPageStarted(view, url, favicon);
-                Log.d("VideoActivity_pi", "页面开始加载: " + url);
-            }
-
-            @Override
             public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                Log.d("VideoActivity_pi", "页面加载完成: " + url);
-
                 if (!url.equals("about:blank") && raspiIp != null && url.contains(raspiIp)) {
-                    mainHandler.postDelayed(() -> showVideoStream(), 2000);
+                    mainHandler.postDelayed(VideoActivity_pi.this::showVideoStream, 2000);
                 }
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                super.onReceivedError(view, request, error);
-                Log.e("VideoActivity_pi", "WebView错误: " + error.getDescription());
-                showConnectionError("加载失败: " + error.getDescription().toString());
+                showConnectionError("加载失败: " + error.getDescription());
             }
 
             @Override
-            public void onReceivedHttpError(WebView view, WebResourceRequest request,
-                                            WebResourceResponse errorResponse) {
-                super.onReceivedHttpError(view, request, errorResponse);
-                String url = request.getUrl().toString();
-                Log.e("VideoActivity_pi", "HTTP错误 - URL: " + url);
-                int statusCode = errorResponse.getStatusCode();
-                Log.e("VideoActivity_pi", "HTTP错误码: " + statusCode);
-
-                if (url.contains("stream")) {
-                    showConnectionError("视频流连接失败: " + statusCode);
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                if (request.getUrl().toString().contains("stream")) {
+                    showConnectionError("视频流连接失败: " + errorResponse.getStatusCode());
                 }
-            }
-        });
-
-        webView.setWebChromeClient(new android.webkit.WebChromeClient() {
-            @Override
-            public boolean onConsoleMessage(android.webkit.ConsoleMessage consoleMessage) {
-                Log.d("WebView", consoleMessage.message());
-                return true;
             }
         });
     }
@@ -195,69 +157,67 @@ public class VideoActivity_pi extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, callback);
     }
 
-    // 发现树莓派设备
+    private void autoDetectFrame() {
+        if (webView.getWidth() == 0 || webView.getHeight() == 0
+                || onnxDetector == null || !onnxDetector.isModelLoaded()) {
+            return;
+        }
+
+        Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(bitmap);
+        webView.draw(canvas);
+
+        executor.execute(() -> {
+            String result = onnxDetector.detect(bitmap);
+            if (result != null && !result.isEmpty()) {
+                Log.d("VideoActivity_pi", "检测结果: " + result);
+            }
+        });
+    }
+
     private void discoverRaspberryPi() {
         showSearchingStatus();
-
         udpDiscoverThread = new Thread(() -> {
             try {
                 udpSocket = new DatagramSocket();
                 udpSocket.setBroadcast(true);
-                udpSocket.setSoTimeout(3000); // 3秒超时
+                udpSocket.setSoTimeout(3000);
 
-                // 发送发现请求
                 String discoverMsg = "DISCOVER_RASPI";
                 byte[] data = discoverMsg.getBytes();
-                DatagramPacket packet = new DatagramPacket(
-                        data, data.length,
-                        InetAddress.getByName("255.255.255.255"),
-                        45678
-                );
-
-                Log.d("UDP", "发送树莓派发现请求");
+                DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), 45678);
                 udpSocket.send(packet);
 
-                // 等待响应
                 byte[] buffer = new byte[256];
                 DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
                 udpSocket.receive(responsePacket);
-
                 String response = new String(responsePacket.getData(), 0, responsePacket.getLength()).trim();
-                Log.d("UDP", "收到树莓派响应: " + response);
 
-                // 解析响应: RASPI:192.168.1.100:OFF
                 if (response.startsWith("RASPI:")) {
                     String[] parts = response.split(":");
                     if (parts.length >= 3) {
                         String ip = parts[1];
                         String videoStatus = parts[2];
-
                         if (ip.matches("\\d+\\.\\d+\\.\\d+\\.\\d+")) {
                             raspiIp = ip;
-                            Log.d("UDP", "发现树莓派IP: " + ip + ", 视频状态: " + videoStatus);
-
                             runOnUiThread(() -> {
                                 tvStatus.setText("发现树莓派: " + ip);
                                 if ("ON".equals(videoStatus)) {
-                                    // 视频已启动，直接连接
-                                    checkDeviceConnection();
+                                    VideoActivity_pi.this.checkDeviceConnection();
                                 } else {
-                                    // 启动视频流
                                     startRaspberryPiVideo();
                                 }
                             });
                         }
                     }
                 }
-
             } catch (Exception e) {
-                Log.e("UDP", "发现树莓派失败: " + e.getMessage());
                 runOnUiThread(() -> {
                     retryCount++;
                     if (retryCount < MAX_RETRY_COUNT) {
-                        mainHandler.postDelayed(this::discoverRaspberryPi, 2000);
+                        mainHandler.postDelayed(VideoActivity_pi.this::discoverRaspberryPi, 2000);
                     } else {
-                        showConnectionError("未发现树莓派设备，请检查网络连接");
+                        showConnectionError("未发现树莓派设备，请检查网络");
                     }
                 });
             } finally {
@@ -269,7 +229,6 @@ public class VideoActivity_pi extends AppCompatActivity {
         udpDiscoverThread.start();
     }
 
-    // 启动树莓派视频流
     private void startRaspberryPiVideo() {
         new Thread(() -> {
             try {
@@ -277,58 +236,26 @@ public class VideoActivity_pi extends AppCompatActivity {
                 socket.setBroadcast(true);
                 socket.setSoTimeout(5000);
 
-                // 发送启动视频命令
                 String startCmd = "START_VIDEO";
                 byte[] data = startCmd.getBytes();
-                DatagramPacket packet = new DatagramPacket(
-                        data, data.length,
-                        InetAddress.getByName("255.255.255.255"),
-                        45678
-                );
-
-                Log.d("UDP", "发送启动视频命令");
+                DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), 45678);
                 socket.send(packet);
 
-                // 等待响应
                 byte[] buffer = new byte[256];
                 DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
                 socket.receive(responsePacket);
-
                 String response = new String(responsePacket.getData(), 0, responsePacket.getLength()).trim();
-                Log.d("UDP", "启动视频响应: " + response);
 
                 if (response.startsWith("OK:")) {
-                    runOnUiThread(() -> checkDeviceConnection());
+                    runOnUiThread(VideoActivity_pi.this::checkDeviceConnection);
                 } else {
                     runOnUiThread(() -> showConnectionError("启动视频流失败"));
                 }
-
                 socket.close();
-
             } catch (Exception e) {
-                Log.e("UDP", "启动视频流失败: " + e.getMessage());
                 runOnUiThread(() -> showConnectionError("启动视频流失败: " + e.getMessage()));
             }
         }).start();
-    }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        if (executor != null && !executor.isShutdown()) {
-            executor.shutdown();
-        }
-        if (webView != null) {
-            webView.destroy();
-        }
-        if (udpDiscoverThread != null && udpDiscoverThread.isAlive()) {
-            udpDiscoverThread.interrupt();
-        }
-        if (udpSocket != null && !udpSocket.isClosed()) {
-            udpSocket.close();
-        }
-        detectHandler.removeCallbacks(detectRunnable);
-        TTSPlayer.shutdown();
     }
 
     private void checkDeviceConnection() {
@@ -336,17 +263,15 @@ public class VideoActivity_pi extends AppCompatActivity {
             showConnectionError("未获取到树莓派IP");
             return;
         }
-
         executor.execute(() -> {
             boolean isConnected = pingDevice();
-
             mainHandler.post(() -> {
                 if (isConnected) {
                     loadVideoStream();
                 } else {
                     retryCount++;
                     if (retryCount < MAX_RETRY_COUNT) {
-                        mainHandler.postDelayed(this::checkDeviceConnection, 2000);
+                        mainHandler.postDelayed(VideoActivity_pi.this::checkDeviceConnection, 2000);
                     } else {
                         showConnectionError("连接树莓派失败");
                     }
@@ -358,38 +283,35 @@ public class VideoActivity_pi extends AppCompatActivity {
     private boolean pingDevice() {
         if (raspiIp == null) return false;
         try {
-            String urlStr = "http://" + raspiIp + ":5000/";
-            Log.d("VideoActivity_pi", "开始ping树莓派: " + urlStr);
-            URL url = new URL(urlStr);
+            URL url = new URL("http://" + raspiIp + ":5000/");
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(TIMEOUT_MS);
             connection.setReadTimeout(TIMEOUT_MS);
-
             int responseCode = connection.getResponseCode();
             connection.disconnect();
-
-            Log.d("VideoActivity_pi", "Ping响应码: " + responseCode);
             return responseCode == HttpURLConnection.HTTP_OK;
-
         } catch (IOException e) {
-            Log.e("VideoActivity_pi", "Ping失败: " + e.getMessage());
             return false;
         }
     }
 
     private void loadVideoStream() {
         if (raspiIp == null) return;
-        Log.d("VideoActivity_pi", "开始加载树莓派视频流");
-        tvStatus.setText("连接成功，加载视频流...");
+        tvStatus.setVisibility(View.GONE);
+        progressBar.setVisibility(View.GONE);
+        btnRetry.setVisibility(View.GONE);
+        webView.setVisibility(View.VISIBLE);
 
         String streamUrl = "http://" + raspiIp + ":5000/stream";
-        String html = "<html><body style='margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;width:100vw;'>" +
-                "<img src='" + streamUrl + "' style='width:100vw;height:auto;display:block;' />" +
-                "</body></html>";
-
-        Log.d("VideoActivity_pi", "树莓派流URL: " + streamUrl);
+        String html = "<html><body style='margin:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;width:100vw;'>"
+                + "<img src='" + streamUrl + "' style='width:100vw;height:auto;display:block;' />"
+                + "</body></html>";
         webView.loadDataWithBaseURL("http://" + raspiIp + ":5000/", html, "text/html", "UTF-8", null);
+
+        if (onnxDetector != null && onnxDetector.isModelLoaded()) {
+            detectHandler.postDelayed(detectRunnable, AUTO_DETECT_INTERVAL_MS);
+        }
     }
 
     private void showSearchingStatus() {
@@ -404,9 +326,6 @@ public class VideoActivity_pi extends AppCompatActivity {
         progressBar.setVisibility(View.GONE);
         btnRetry.setVisibility(View.GONE);
         webView.setVisibility(View.VISIBLE);
-
-        Toast.makeText(this, "树莓派视频流连接成功", Toast.LENGTH_SHORT).show();
-        detectHandler.postDelayed(detectRunnable, AUTO_DETECT_INTERVAL_MS);
     }
 
     private void showConnectionError(String message) {
@@ -414,7 +333,6 @@ public class VideoActivity_pi extends AppCompatActivity {
         progressBar.setVisibility(View.GONE);
         btnRetry.setVisibility(View.VISIBLE);
         webView.setVisibility(View.GONE);
-
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
@@ -426,72 +344,51 @@ public class VideoActivity_pi extends AppCompatActivity {
             return;
         }
 
-        // ✅ 截取 WebView 的画面
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         webView.draw(canvas);
 
         Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
 
-        // ✅ 调用百度 OCR 上传
         BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
             @Override
             public void onSuccess(String resultJson) {
                 runOnUiThread(() -> {
                     try {
                         JSONObject json = new JSONObject(resultJson);
-
                         StringBuilder sb = new StringBuilder();
-
                         if (json.has("words_result")) {
                             JSONArray wordsArray = json.getJSONArray("words_result");
-                            if (wordsArray.length() > 0) {
-                                for (int i = 0; i < wordsArray.length(); i++) {
-                                    JSONObject obj = wordsArray.getJSONObject(i);
-                                    sb.append(obj.getString("words"));
-                                    if (i < wordsArray.length() - 1) sb.append("，");
-                                }
-                            } else {
-                                sb.append("未识别到文字");
+                            for (int i = 0; i < wordsArray.length(); i++) {
+                                JSONObject obj = wordsArray.getJSONObject(i);
+                                sb.append(obj.getString("words"));
+                                if (i < wordsArray.length() - 1) sb.append("，");
                             }
-                        }
-                        // 如果没有 words_result，尝试读取 result（通用物体识别返回字段）
-                        else if (json.has("result")) {
-                            JSONArray resultArray = json.getJSONArray("result");
-                            if (resultArray.length() > 0) {
-                                for (int i = 0; i < resultArray.length(); i++) {
-                                    JSONObject obj = resultArray.getJSONObject(i);
-                                    sb.append(obj.getString("keyword"));
-                                    if (i < resultArray.length() - 1) sb.append("，");
-                                }
-                            } else {
-                                sb.append("未识别到物体");
-                            }
-                        }
-                        else {
+                        } else {
                             sb.append("未识别到可用结果");
                         }
-
                         String sentence = sb.toString();
                         Toast.makeText(VideoActivity_pi.this, sentence, Toast.LENGTH_LONG).show();
-                        TTSPlayer.speak(sentence);
-
                     } catch (Exception e) {
                         Toast.makeText(VideoActivity_pi.this, "解析出错：" + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 });
             }
 
-
             @Override
             public void onError(String errorMessage) {
-                runOnUiThread(() -> {
-                    Toast.makeText(VideoActivity_pi.this,
-                            "上传失败：" + errorMessage,
-                            Toast.LENGTH_LONG).show();
-                });
+                runOnUiThread(() -> Toast.makeText(VideoActivity_pi.this, "上传失败：" + errorMessage, Toast.LENGTH_LONG).show());
             }
         });
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (executor != null && !executor.isShutdown()) executor.shutdown();
+        if (webView != null) webView.destroy();
+        if (udpDiscoverThread != null && udpDiscoverThread.isAlive()) udpDiscoverThread.interrupt();
+        if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
+        detectHandler.removeCallbacks(detectRunnable);
+    }
 }
