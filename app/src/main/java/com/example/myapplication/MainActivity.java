@@ -61,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(this, "自动进入AI模式", Toast.LENGTH_SHORT).show();
             Intent intent = new Intent(MainActivity.this, AIChatActivity.class);
             startActivity(intent);
-        }, 1000);
+        }, 3000);
 
         // -----------------------------
         // 新增：测试 ONNX 模型识别 test1.webp

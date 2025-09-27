@@ -31,10 +31,12 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="改了语音识别的bug">
+    <list default="true" id="78823e30-9454-4ab7-92b4-012900cd8ac0" name="Changes" comment="记录下待修bug:1.重复问候 2.熄屏后唤醒才能正常显示和跳转">
       <change beforePath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/deploymentTargetSelector.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/AIChatActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/AIChatActivity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/MainActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/MainActivity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/NavigationActivity.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/PatrickAIManager.java" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/myapplication/PatrickAIManager.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -312,7 +314,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758343222842</updated>
     </task>
-    <option name="localTasksCounter" value="15" />
+    <task id="LOCAL-00015" summary="记录下待修bug:1.重复问候 2.熄屏后唤醒才能正常显示和跳转">
+      <option name="closed" value="true" />
+      <created>1758404201735</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1758404201735</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -329,7 +339,8 @@
     <MESSAGE value="修改了图片识别的bug" />
     <MESSAGE value="换了个Patrick皮肤" />
     <MESSAGE value="改了语音识别的bug" />
-    <option name="LAST_COMMIT_MESSAGE" value="改了语音识别的bug" />
+    <MESSAGE value="记录下待修bug:1.重复问候 2.熄屏后唤醒才能正常显示和跳转" />
+    <option name="LAST_COMMIT_MESSAGE" value="记录下待修bug:1.重复问候 2.熄屏后唤醒才能正常显示和跳转" />
   </component>
   <component name="play_dynamic_filters_status">
     <option name="appIdToCheckInfo">
@@ -346,7 +357,7 @@
         </entry>
         <entry key="com.example.myapplication">
           <value>
-            <CheckInfo lastCheckTimestamp="1758339202130" />
+            <CheckInfo lastCheckTimestamp="1758772345913" />
           </value>
         </entry>
         <entry key="com.example.myapplication.core.test">
@@ -356,7 +367,7 @@
         </entry>
         <entry key="com.example.myapplication.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1758339202130" />
+            <CheckInfo lastCheckTimestamp="1758772345913" />
           </value>
         </entry>
         <entry key="com.example.myapplication.uiasr.test">

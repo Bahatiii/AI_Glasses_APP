@@ -15,6 +15,8 @@ import okhttp3.Response;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PatrickAIManager {
     private static PatrickAIManager instance;
@@ -38,6 +40,7 @@ public class PatrickAIManager {
     // 思考和说话状态
     private boolean isThinking = false;
     private boolean isSpeaking = false;
+    private boolean isPatrickSpeaking = false; // Track if Patrick is speaking
     private Handler thinkingHandler = new Handler(Looper.getMainLooper());
     private Runnable thinkingRunnable;
     private android.media.AudioManager audioManager;
@@ -81,8 +84,12 @@ public class PatrickAIManager {
         try {
             SpeechUtility.createUtility(context, "appid=9be1e7dc");
             speechRecognizer = SpeechRecognizer.createRecognizer(context, null);
+            speechRecognizer.setParameter(SpeechConstant.ASR_PTT, "0"); // Disable punctuation
+            speechRecognizer.setParameter(SpeechConstant.VAD_BOS, "4000"); // Increase timeout for speech start
+            speechRecognizer.setParameter(SpeechConstant.VAD_EOS, "1200"); // Increase timeout for speech end
+            speechRecognizer.setParameter(SpeechConstant.SAMPLE_RATE, "16000"); // Use higher sample rate for better accuracy
         } catch (Exception e) {
-            Log.e("PatrickAI", "语音识别初始化失败: " + e.getMessage());
+            Log.e("PatrickAI", "Speech recognizer initialization failed: " + e.getMessage());
         }
     }
 
@@ -457,64 +464,48 @@ public class PatrickAIManager {
             String text = results.getResultString();
             long speechDuration = System.currentTimeMillis() - speechStartTime;
 
-            Log.d("PatrickAI", "=== 语音识别结果 ===");
-            Log.d("PatrickAI", "原始识别结果: '" + text + "'");
-            Log.d("PatrickAI", "语音时长: " + speechDuration + "ms");
-            Log.d("PatrickAI", "文本长度: " + (text != null ? text.length() : 0));
-            Log.d("PatrickAI", "isLast: " + isLast);
+            Log.d("PatrickAI", "Speech recognition result: " + text);
 
-            // 对于确认类词汇，放宽过滤条件
-            boolean isConfirmation = isConfirmationWord(text);
-            int minLength = isConfirmation ? 300 : MIN_SPEECH_LENGTH; // 确认词最少300ms
-            int minTextLen = isConfirmation ? 1 : MIN_TEXT_LENGTH; // 确认词最少1个字符
+            if (isPatrickSpeaking) {
+                Log.d("PatrickAI", "Ignored self-input during Patrick's speech.");
+                return;
+            }
 
-            Log.d("PatrickAI", "isConfirmation: " + isConfirmation);
-            Log.d("PatrickAI", "minLength: " + minLength);
-            Log.d("PatrickAI", "minTextLen: " + minTextLen);
-
-            // 加强过滤条件，但对确认词放宽
-            if (text != null && !text.trim().isEmpty() &&
-                    speechDuration > minLength &&
-                    text.length() >= minTextLen &&
-                    (isConfirmation || !text.matches(".*[啊呀哦嗯嗯呢噢].*"))) {
-                Log.d("PatrickAI", "✓ 语音通过过滤，准备处理: " + text + (isConfirmation ? " (确认词)" : ""));
+            if (text != null && !text.trim().isEmpty() && speechDuration > MIN_SPEECH_LENGTH) {
                 handleUserInput(text);
             } else {
-                Log.d("PatrickAI", "✗ 语音被过滤: " + text);
-                Log.d("PatrickAI", "过滤原因 - 时长:" + speechDuration + "ms(需要>" + minLength + "), 长度:" +
-                        (text != null ? text.length() : 0) + "(需要>=" + minTextLen + ")");
+                Log.d("PatrickAI", "Filtered out invalid speech input.");
                 if (isLast && isEnabled && !isThinking && !isSpeaking) {
-                    Log.d("PatrickAI", "重新开始监听");
                     mainHandler.postDelayed(() -> {
                         if (isEnabled && !isThinking && !isSpeaking) {
                             startContinuousListening();
                         }
-                    }, 1000);
+                    }, 500); // Reduced delay for quicker response
                 }
             }
         }
 
         @Override
         public void onError(SpeechError error) {
-            Log.e("PatrickAI", "语音识别错误: " + error.getPlainDescription(true) + " 错误码: " + error.getErrorCode());
+            Log.e("PatrickAI", "Speech recognition error: " + error.getPlainDescription(true) + " Error code: " + error.getErrorCode());
 
-            if (error.getErrorCode() == 10118) {
-                Log.d("PatrickAI", "未检测到语音，重新开始监听");
+            if (error.getErrorCode() == 10118) { // No speech detected
+                Log.d("PatrickAI", "No speech detected, restarting listening.");
                 if (isEnabled && !isThinking && !isSpeaking) {
                     mainHandler.postDelayed(() -> {
                         if (isEnabled && !isThinking && !isSpeaking) {
                             startContinuousListening();
                         }
-                    }, 1000);
+                    }, 500); // Reduced delay for quicker restart
                 }
             } else {
-                Log.d("PatrickAI", "其他错误，延迟重新监听");
+                Log.d("PatrickAI", "Other error, delaying restart.");
                 if (isEnabled && !isThinking && !isSpeaking) {
                     mainHandler.postDelayed(() -> {
                         if (isEnabled && !isThinking && !isSpeaking) {
                             startContinuousListening();
                         }
-                    }, 3000);
+                    }, 1500); // Reduced delay for quicker recovery
                 }
             }
         }
@@ -539,14 +530,13 @@ public class PatrickAIManager {
 
     private void speakAndCallback(String text) {
         isSpeaking = true;
+        isPatrickSpeaking = true; // Mark Patrick as speaking
         forceStopListening();
-
         // Register a TTS listener to reliably pause/resume recognizer during TTS playback
         TTSPlayer.registerListener(new com.example.myapplication.TTSPlayer.TTSListener() {
             @Override
             public void onTtsStart(String utteranceId) {
                 Log.d("PatrickAI", "TTS started: " + utteranceId);
-                // ensure recognizer is stopped while TTS plays
                 forceStopListening();
                 muteMic();
             }
@@ -555,24 +545,26 @@ public class PatrickAIManager {
             public void onTtsDone(String utteranceId) {
                 Log.d("PatrickAI", "TTS done: " + utteranceId);
                 isSpeaking = false;
+                isPatrickSpeaking = false; // Reset Patrick speaking flag
                 isEnabled = true;
                 unmuteMic();
                 TTSPlayer.unregisterListener();
                 mainHandler.postDelayed(() -> {
                     if (!isThinking && !isSpeaking) startContinuousListening();
-                }, 400);
+                }, 300); // Reduced delay for quicker restart
             }
 
             @Override
             public void onTtsError(String utteranceId) {
                 Log.d("PatrickAI", "TTS error: " + utteranceId);
                 isSpeaking = false;
+                isPatrickSpeaking = false; // Reset Patrick speaking flag
                 isEnabled = true;
                 unmuteMic();
                 TTSPlayer.unregisterListener();
                 mainHandler.postDelayed(() -> {
                     if (!isThinking && !isSpeaking) startContinuousListening();
-                }, 400);
+                }, 300); // Reduced delay for quicker restart
             }
         });
 
@@ -623,5 +615,45 @@ public class PatrickAIManager {
             Log.w("PatrickAI", "unmute on destroy failed: " + e.getMessage());
         }
         instance = null;
+    }
+
+    private final List<String> pendingPatrickMessages = new ArrayList<>();
+    private final List<String> pendingUserMessages = new ArrayList<>();
+    private boolean pendingNavigationRequest = false;
+    private boolean pendingVideoRequest = false;
+
+    public void flushPendingToCallback() {
+        if (this.callback == null) return;
+        Runnable flush = () -> {
+            synchronized (pendingPatrickMessages) {
+                for (String msg : pendingPatrickMessages) {
+                    try { callback.onPatrickSpeak(msg); } catch (Exception e) { Log.w("PatrickAI", "flushPatrickSpeak failed: " + e.getMessage()); }
+                }
+                pendingPatrickMessages.clear();
+            }
+            synchronized (pendingUserMessages) {
+                for (String u : pendingUserMessages) {
+                    try { callback.onUserSpeak(u); } catch (Exception e) { Log.w("PatrickAI", "flushUserSpeak failed: " + e.getMessage()); }
+                }
+                pendingUserMessages.clear();
+            }
+            if (pendingNavigationRequest) {
+                try { callback.onNavigationRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushNavigation failed: " + e.getMessage()); }
+                pendingNavigationRequest = false;
+            }
+            if (pendingVideoRequest) {
+                try { callback.onVideoRequest(); } catch (Exception e) { Log.w("PatrickAI", "flushVideo failed: " + e.getMessage()); }
+                pendingVideoRequest = false;
+            }
+        };
+
+        // 如果当前在主线程，直接执行以便立刻刷新；否则 post 到 mainHandler
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            flush.run();
+        } else if (mainHandler != null) {
+            mainHandler.post(flush);
+        } else {
+            flush.run();
+        }
     }
 }

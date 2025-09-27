@@ -18,6 +18,8 @@ import java.util.Arrays;
 public class AIChatActivity extends AppCompatActivity implements PatrickAIManager.PatrickCallback {
 
     private static final int AUDIO_PERMISSION_REQUEST_CODE = 2001;
+    private static final int REQUEST_NAVIGATION = 3001;
+    private static final int REQUEST_VIDEO = 3002;
 
     private EditText etInput;
     private Button btnSend;
@@ -25,6 +27,8 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     private ScrollView scrollChat;
 
     private PatrickAIManager patrickAI;
+    // 当从子 Activity（导航/视频）返回时，使用此标志避免 onResume 重复立即 resumeListening
+    private boolean suppressAutoResumeOnNextResume = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -103,7 +107,8 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     public void onNavigationRequest() {
         runOnUiThread(() -> {
             Intent intent = new Intent(this, NavigationActivity.class);
-            startActivity(intent);
+            // start for result so we can reliably detect returning from navigation and update UI
+            startActivityForResult(intent, REQUEST_NAVIGATION);
         });
     }
 
@@ -111,8 +116,26 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     public void onVideoRequest() {
         runOnUiThread(() -> {
             Intent intent = new Intent(this, VideoActivity_pi.class);
-            startActivity(intent);
+            startActivityForResult(intent, REQUEST_VIDEO);
         });
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_NAVIGATION || requestCode == REQUEST_VIDEO) {
+            runOnUiThread(() -> {
+                tvChat.append("\u5df2\u8fd4\u56deAI\u804a\u5929\u6a21\u5f0f\n");
+                scrollToBottom();
+                if (patrickAI != null) {
+                    patrickAI.setCallback(this);
+                    patrickAI.flushPendingToCallback();
+                    patrickAI.pauseListening();
+                    suppressAutoResumeOnNextResume = true;
+                    showPatrickGreeting();
+                }
+            });
+        }
     }
 
     // --- 权限 ---
@@ -164,7 +187,16 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
         if (patrickAI != null) {
             // **关键修改：确保回调正确设置**
             patrickAI.setCallback(this);
-            patrickAI.resumeListening();
+            // 立即刷新 pending 到 UI，保证 onResume 时能立刻显示之前的消息
+            patrickAI.flushPendingToCallback();
+            // 如果刚才我们在 onActivityResult 已经安排了 showPatrickGreeting（suppress 标志被设置），
+            // 则不要在这里重复立即 resumeListening，等待 showPatrickGreeting 安排恢复。
+            if (!suppressAutoResumeOnNextResume) {
+                patrickAI.resumeListening();
+            } else {
+                // 清除一次性标志，以便后续正常 resume
+                suppressAutoResumeOnNextResume = false;
+            }
             Log.d("AIChatActivity", "Patrick回调已重新设置为AIChatActivity");
         }
     }
@@ -191,13 +223,18 @@ public class AIChatActivity extends AppCompatActivity implements PatrickAIManage
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-
-        // 检查是否从导航返回
         boolean isFromNavigation = intent.getBooleanExtra("from_navigation", false);
         if (isFromNavigation) {
             runOnUiThread(() -> {
-                tvChat.append("已返回AI聊天模式\n");
+                tvChat.append("\u5df2\u8fd4\u56deAI\u804a\u5929\u6a21\u5f0f\n");
                 scrollToBottom();
+                if (patrickAI != null) {
+                    patrickAI.setCallback(this);
+                    patrickAI.flushPendingToCallback();
+                    patrickAI.pauseListening();
+                    suppressAutoResumeOnNextResume = true;
+                    showPatrickGreeting();
+                }
             });
         }
     }

@@ -764,8 +764,15 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         if (mAMapNaviView != null) mAMapNaviView.onDestroy();
         if (locationClient != null) { locationClient.stopLocation(); locationClient.onDestroy(); }
         if (mIat != null) { mIat.cancel(); mIat.destroy(); }
-        if (patrickAI != null) patrickAI.setCallback(null);
+
+        // 不要在 onDestroy 中把 Patrick 的 callback 设为 null —— 会导致回到聊天界面时 UI 收不到回调
+        if (patrickAI != null) {
+            // 只暂停监听并保持 callback（AI 管理器仍然可被 Activity 重新绑定）
+            patrickAI.pauseListening();
+            // patrickAI.setCallback(null); // 已移除
+        }
     }
+
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
