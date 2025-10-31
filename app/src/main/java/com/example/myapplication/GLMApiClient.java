@@ -17,7 +17,7 @@ public class GLMApiClient {
 
     public void chatCompletion(String userMessage, Callback callback) {
         ChatRequest request = new ChatRequest();
-        request.model = "glm-4.5-air";
+        request.model = "glm-4.5";
         request.messages = new Message[]{
                 new Message("user", userMessage)
         };

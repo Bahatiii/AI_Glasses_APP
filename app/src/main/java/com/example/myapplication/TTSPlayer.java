@@ -29,8 +29,10 @@ public class TTSPlayer {
     }
 
     public static void init(Context context) {
+        Log.d("TTSPlayer", "init TTS");
         if (tts == null) {
             tts = new TextToSpeech(context.getApplicationContext(), status -> {
+                Log.d("TTSPlayer", "TTS初始化回调 status=" + status);
                 if (status == TextToSpeech.SUCCESS) {
                     int result = tts.setLanguage(Locale.CHINESE);
                     Log.d("TTSPlayer", "setLanguage result: " + result);
@@ -87,9 +89,17 @@ public class TTSPlayer {
         Log.d("TTSPlayer", "speak called: " + text);
         if (tts != null && isReady) {
             String uid = UUID.randomUUID().toString();
+            Log.d("TTSPlayer", "tts.speak: " + text + ", uid=" + uid);
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, uid);
         } else {
-            pendingText = text; // 还没初始化好，先存起来，等init完成后自动播报
+            Log.d("TTSPlayer", "TTS未初始化，pendingText=" + text);
+            pendingText = text;
+        }
+    }
+
+    public static void stop() {
+        if (tts != null) {
+            tts.stop();
         }
     }
 
@@ -101,5 +111,9 @@ public class TTSPlayer {
             isReady = false;
             pendingText = null;
         }
+    }
+
+    public static boolean isReady() {
+        return isReady;
     }
 }

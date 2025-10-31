@@ -49,21 +49,23 @@ public class VideoActivity_pi extends AppCompatActivity {
     private ExecutorService executor;
     private Handler mainHandler;
     private int retryCount = 0;
-    private OnnxDetector onnxDetector;
+    // 删除 OnnxDetector 实例
+    // private OnnxDetector onnxDetector;
 
     private volatile String raspiIp = null;
     private DatagramSocket udpSocket;
     private Thread udpDiscoverThread;
 
-    private final int AUTO_DETECT_INTERVAL_MS = 1000;
-    private final Handler detectHandler = new Handler(Looper.getMainLooper());
-    private final Runnable detectRunnable = new Runnable() {
-        @Override
-        public void run() {
-            autoDetectFrame();
-            detectHandler.postDelayed(this, AUTO_DETECT_INTERVAL_MS);
-        }
-    };
+    // 删除自动检测相关的 Handler 和 Runnable
+    // private final int AUTO_DETECT_INTERVAL_MS = 1000;
+    // private final Handler detectHandler = new Handler(Looper.getMainLooper());
+    // private final Runnable detectRunnable = new Runnable() {
+    //     @Override
+    //     public void run() {
+    //         autoDetectFrame();
+    //         detectHandler.postDelayed(this, AUTO_DETECT_INTERVAL_MS);
+    //     }
+    // };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -84,15 +86,16 @@ public class VideoActivity_pi extends AppCompatActivity {
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
 
-        // 初始化 OnnxDetector
-        onnxDetector = new OnnxDetector(this);
-        if (onnxDetector != null && onnxDetector.isModelLoaded()) {
-            tvStatus.setText("模型加载成功 ✅");
-            Log.d("VideoActivity_pi", "OnnxDetector 初始化成功");
-        } else {
-            tvStatus.setText("模型加载失败 ❌");
-            Log.e("VideoActivity_pi", "OnnxDetector 初始化失败");
-        }
+        // 删除 OnnxDetector 的初始化和状态检查
+        // onnxDetector = new OnnxDetector(this);
+        // if (onnxDetector != null && onnxDetector.isModelLoaded()) {
+        //     tvStatus.setText("模型加载成功 ✅");
+        //     Log.d("VideoActivity_pi", "OnnxDetector 初始化成功");
+        // } else {
+        //     tvStatus.setText("模型加载失败 ❌");
+        //     Log.e("VideoActivity_pi", "OnnxDetector 初始化失败");
+        // }
+        tvStatus.setText("正在初始化..."); // 可以设置一个默认的初始状态文本
 
         // 启动树莓派发现
         discoverRaspberryPi();
@@ -157,23 +160,24 @@ public class VideoActivity_pi extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, callback);
     }
 
-    private void autoDetectFrame() {
-        if (webView.getWidth() == 0 || webView.getHeight() == 0
-                || onnxDetector == null || !onnxDetector.isModelLoaded()) {
-            return;
-        }
-
-        Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        webView.draw(canvas);
-
-        executor.execute(() -> {
-            String result = onnxDetector.detect(bitmap);
-            if (result != null && !result.isEmpty()) {
-                Log.d("VideoActivity_pi", "检测结果: " + result);
-            }
-        });
-    }
+    // 删除整个 autoDetectFrame 方法
+    // private void autoDetectFrame() {
+    //     if (webView.getWidth() == 0 || webView.getHeight() == 0
+    //             || onnxDetector == null || !onnxDetector.isModelLoaded()) {
+    //         return;
+    //     }
+    //
+    //     Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
+    //     Canvas canvas = new Canvas(bitmap);
+    //     webView.draw(canvas);
+    //
+    //     executor.execute(() -> {
+    //         String result = onnxDetector.detect(bitmap);
+    //         if (result != null && !result.isEmpty()) {
+    //             Log.d("VideoActivity_pi", "检测结果: " + result);
+    //         }
+    //     });
+    // }
 
     private void discoverRaspberryPi() {
         showSearchingStatus();
@@ -309,9 +313,10 @@ public class VideoActivity_pi extends AppCompatActivity {
                 + "</body></html>";
         webView.loadDataWithBaseURL("http://" + raspiIp + ":5000/", html, "text/html", "UTF-8", null);
 
-        if (onnxDetector != null && onnxDetector.isModelLoaded()) {
-            detectHandler.postDelayed(detectRunnable, AUTO_DETECT_INTERVAL_MS);
-        }
+        // 删除启动自动检测的调用
+        // if (onnxDetector != null && onnxDetector.isModelLoaded()) {
+        //     detectHandler.postDelayed(detectRunnable, AUTO_DETECT_INTERVAL_MS);
+        // }
     }
 
     private void showSearchingStatus() {
@@ -337,22 +342,27 @@ public class VideoActivity_pi extends AppCompatActivity {
     }
 
     private void captureAndUploadFrame() {
+        Log.d("OCR_DEBUG", "captureAndUploadFrame: 开始截图和上传");
         int width = webView.getWidth();
         int height = webView.getHeight();
         if (width == 0 || height == 0) {
             Toast.makeText(this, "WebView 大小为 0，无法截图", Toast.LENGTH_SHORT).show();
+            Log.e("OCR_DEBUG", "captureAndUploadFrame: WebView大小为0，无法截图");
             return;
         }
+        Log.d("OCR_DEBUG", "captureAndUploadFrame: WebView尺寸: " + width + "x" + height);
 
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         webView.draw(canvas);
 
         Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
+        Log.d("OCR_DEBUG", "captureAndUploadFrame: 截图成功，调用BaiduImageUploader");
 
         BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
             @Override
             public void onSuccess(String resultJson) {
+                Log.d("OCR_DEBUG", "onSuccess: 收到成功回调，JSON: " + resultJson);
                 runOnUiThread(() -> {
                     try {
                         JSONObject json = new JSONObject(resultJson);
@@ -364,12 +374,18 @@ public class VideoActivity_pi extends AppCompatActivity {
                                 sb.append(obj.getString("words"));
                                 if (i < wordsArray.length() - 1) sb.append("，");
                             }
+                        } else if (json.has("error_msg")) {
+                            String errorMsg = json.getString("error_msg");
+                            sb.append("识别失败: ").append(errorMsg);
+                            Log.e("OCR_DEBUG", "百度API返回错误: " + errorMsg);
                         } else {
                             sb.append("未识别到可用结果");
                         }
                         String sentence = sb.toString();
+                        Log.d("OCR_DEBUG", "解析后的句子: " + sentence);
                         Toast.makeText(VideoActivity_pi.this, sentence, Toast.LENGTH_LONG).show();
                     } catch (Exception e) {
+                        Log.e("OCR_DEBUG", "解析JSON时出错", e);
                         Toast.makeText(VideoActivity_pi.this, "解析出错：" + e.getMessage(), Toast.LENGTH_LONG).show();
                     }
                 });
@@ -377,6 +393,7 @@ public class VideoActivity_pi extends AppCompatActivity {
 
             @Override
             public void onError(String errorMessage) {
+                Log.e("OCR_DEBUG", "onError: 收到错误回调: " + errorMessage);
                 runOnUiThread(() -> Toast.makeText(VideoActivity_pi.this, "上传失败：" + errorMessage, Toast.LENGTH_LONG).show());
             }
         });
@@ -389,6 +406,7 @@ public class VideoActivity_pi extends AppCompatActivity {
         if (webView != null) webView.destroy();
         if (udpDiscoverThread != null && udpDiscoverThread.isAlive()) udpDiscoverThread.interrupt();
         if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
-        detectHandler.removeCallbacks(detectRunnable);
+        // 删除移除 Runnable 的调用
+        // detectHandler.removeCallbacks(detectRunnable);
     }
 }
