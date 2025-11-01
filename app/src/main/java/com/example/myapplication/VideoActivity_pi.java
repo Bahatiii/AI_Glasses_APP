@@ -49,23 +49,92 @@ public class VideoActivity_pi extends AppCompatActivity {
     private ExecutorService executor;
     private Handler mainHandler;
     private int retryCount = 0;
-    // 删除 OnnxDetector 实例
-    // private OnnxDetector onnxDetector;
 
     private volatile String raspiIp = null;
     private DatagramSocket udpSocket;
     private Thread udpDiscoverThread;
 
-    // 删除自动检测相关的 Handler 和 Runnable
-    // private final int AUTO_DETECT_INTERVAL_MS = 1000;
-    // private final Handler detectHandler = new Handler(Looper.getMainLooper());
-    // private final Runnable detectRunnable = new Runnable() {
-    //     @Override
-    //     public void run() {
-    //         autoDetectFrame();
-    //         detectHandler.postDelayed(this, AUTO_DETECT_INTERVAL_MS);
-    //     }
-    // };
+    // ========== 自动检测 + 播报部分 ==========
+    private final Handler detectHandler = new Handler(Looper.getMainLooper());
+    private static final long AUTO_DETECT_INTERVAL_MS = 5000; // 每5秒检测一次
+    private static final long SPEAK_INTERVAL_MS = 8000; // 最小播报间隔
+    private long lastSpeakTime = 0;
+
+    private final Runnable detectRunnable = new Runnable() {
+        @Override
+        public void run() {
+            try {
+                if (webView != null && webView.getWidth() > 0 && webView.getHeight() > 0) {
+                    Bitmap bitmap = Bitmap.createBitmap(
+                            webView.getWidth(),
+                            webView.getHeight(),
+                            Bitmap.Config.ARGB_8888
+                    );
+                    Canvas canvas = new Canvas(bitmap);
+                    webView.draw(canvas);
+
+                    // 调用百度交通识别接口
+                    BaiduTraffic.detectTraffic(bitmap, new BaiduTraffic.TrafficCallback() {
+                        @Override
+                        public void onSuccess(String resultJson) {
+                            Log.d("VideoActivity_pi", "✅ 百度识别返回 JSON: " + resultJson);
+                            try {
+                                JSONObject json = new JSONObject(resultJson);
+                                JSONObject vehicleNum = json.optJSONObject("vehicle_num");
+                                if (vehicleNum == null) {
+                                    Log.d("VideoActivity_pi", "🚫 未识别到车辆字段");
+                                    return;
+                                }
+
+                                int car = vehicleNum.optInt("car", 0);
+                                int truck = vehicleNum.optInt("truck", 0);
+                                int bus = vehicleNum.optInt("bus", 0);
+                                int motorbike = vehicleNum.optInt("motorbike", 0);
+                                int tricycle = vehicleNum.optInt("tricycle", 0);
+
+                                int total = car + truck + bus + motorbike + tricycle;
+                                if (total == 0) {
+                                    Log.d("VideoActivity_pi", "🚫 未检测到车辆，不播报");
+                                    return;
+                                }
+
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("前方检测到 ").append(total).append(" 辆车辆，");
+                                if (car > 0) sb.append(car).append(" 辆小汽车，");
+                                if (truck > 0) sb.append(truck).append(" 辆卡车，");
+                                if (bus > 0) sb.append(bus).append(" 辆公交车，");
+                                if (motorbike > 0) sb.append(motorbike).append(" 辆摩托车，");
+                                if (tricycle > 0) sb.append(tricycle).append(" 辆三轮车，");
+
+                                String speakText = sb.toString();
+                                if (speakText.endsWith("，")) {
+                                    speakText = speakText.substring(0, speakText.length() - 1);
+                                }
+
+                                long now = System.currentTimeMillis();
+                                if (now - lastSpeakTime > SPEAK_INTERVAL_MS) {
+                                    lastSpeakTime = now;
+                                    TTSPlayer.speak(speakText);
+                                    Log.d("VideoActivity_pi", "🔊 播报内容: " + speakText);
+                                }
+                            } catch (Exception e) {
+                                Log.e("VideoActivity_pi", "❌ 解析百度返回 JSON 出错: " + e.getMessage());
+                            }
+                        }
+
+                        @Override
+                        public void onError(String errorMessage) {
+                            Log.e("VideoActivity_pi", "❌ 百度识别失败: " + errorMessage);
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e("VideoActivity_pi", "detectRunnable 出错: " + e.getMessage());
+            }
+            detectHandler.postDelayed(this, AUTO_DETECT_INTERVAL_MS);
+        }
+    };
+    // =========================================
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,18 +155,7 @@ public class VideoActivity_pi extends AppCompatActivity {
         executor = Executors.newSingleThreadExecutor();
         mainHandler = new Handler(Looper.getMainLooper());
 
-        // 删除 OnnxDetector 的初始化和状态检查
-        // onnxDetector = new OnnxDetector(this);
-        // if (onnxDetector != null && onnxDetector.isModelLoaded()) {
-        //     tvStatus.setText("模型加载成功 ✅");
-        //     Log.d("VideoActivity_pi", "OnnxDetector 初始化成功");
-        // } else {
-        //     tvStatus.setText("模型加载失败 ❌");
-        //     Log.e("VideoActivity_pi", "OnnxDetector 初始化失败");
-        // }
-        tvStatus.setText("正在初始化..."); // 可以设置一个默认的初始状态文本
-
-        // 启动树莓派发现
+        tvStatus.setText("正在初始化...");
         discoverRaspberryPi();
 
         btnCapture.setOnClickListener(v -> captureAndUploadFrame());
@@ -160,25 +218,6 @@ public class VideoActivity_pi extends AppCompatActivity {
         getOnBackPressedDispatcher().addCallback(this, callback);
     }
 
-    // 删除整个 autoDetectFrame 方法
-    // private void autoDetectFrame() {
-    //     if (webView.getWidth() == 0 || webView.getHeight() == 0
-    //             || onnxDetector == null || !onnxDetector.isModelLoaded()) {
-    //         return;
-    //     }
-    //
-    //     Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
-    //     Canvas canvas = new Canvas(bitmap);
-    //     webView.draw(canvas);
-    //
-    //     executor.execute(() -> {
-    //         String result = onnxDetector.detect(bitmap);
-    //         if (result != null && !result.isEmpty()) {
-    //             Log.d("VideoActivity_pi", "检测结果: " + result);
-    //         }
-    //     });
-    // }
-
     private void discoverRaspberryPi() {
         showSearchingStatus();
         udpDiscoverThread = new Thread(() -> {
@@ -189,7 +228,8 @@ public class VideoActivity_pi extends AppCompatActivity {
 
                 String discoverMsg = "DISCOVER_RASPI";
                 byte[] data = discoverMsg.getBytes();
-                DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), 45678);
+                DatagramPacket packet = new DatagramPacket(data, data.length,
+                        InetAddress.getByName("255.255.255.255"), 45678);
                 udpSocket.send(packet);
 
                 byte[] buffer = new byte[256];
@@ -239,17 +279,16 @@ public class VideoActivity_pi extends AppCompatActivity {
                 DatagramSocket socket = new DatagramSocket();
                 socket.setBroadcast(true);
                 socket.setSoTimeout(5000);
-
                 String startCmd = "START_VIDEO";
                 byte[] data = startCmd.getBytes();
-                DatagramPacket packet = new DatagramPacket(data, data.length, InetAddress.getByName("255.255.255.255"), 45678);
+                DatagramPacket packet = new DatagramPacket(data, data.length,
+                        InetAddress.getByName("255.255.255.255"), 45678);
                 socket.send(packet);
 
                 byte[] buffer = new byte[256];
                 DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
                 socket.receive(responsePacket);
                 String response = new String(responsePacket.getData(), 0, responsePacket.getLength()).trim();
-
                 if (response.startsWith("OK:")) {
                     runOnUiThread(VideoActivity_pi.this::checkDeviceConnection);
                 } else {
@@ -313,10 +352,8 @@ public class VideoActivity_pi extends AppCompatActivity {
                 + "</body></html>";
         webView.loadDataWithBaseURL("http://" + raspiIp + ":5000/", html, "text/html", "UTF-8", null);
 
-        // 删除启动自动检测的调用
-        // if (onnxDetector != null && onnxDetector.isModelLoaded()) {
-        //     detectHandler.postDelayed(detectRunnable, AUTO_DETECT_INTERVAL_MS);
-        // }
+        // ✅ 启动自动识别任务
+        detectHandler.postDelayed(detectRunnable, 4000);
     }
 
     private void showSearchingStatus() {
@@ -350,51 +387,23 @@ public class VideoActivity_pi extends AppCompatActivity {
             Log.e("OCR_DEBUG", "captureAndUploadFrame: WebView大小为0，无法截图");
             return;
         }
-        Log.d("OCR_DEBUG", "captureAndUploadFrame: WebView尺寸: " + width + "x" + height);
 
         Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
         Canvas canvas = new Canvas(bitmap);
         webView.draw(canvas);
 
         Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
-        Log.d("OCR_DEBUG", "captureAndUploadFrame: 截图成功，调用BaiduImageUploader");
+        Log.d("OCR_DEBUG", "captureAndUploadFrame: 调用BaiduImageUploader");
 
         BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
             @Override
             public void onSuccess(String resultJson) {
-                Log.d("OCR_DEBUG", "onSuccess: 收到成功回调，JSON: " + resultJson);
-                runOnUiThread(() -> {
-                    try {
-                        JSONObject json = new JSONObject(resultJson);
-                        StringBuilder sb = new StringBuilder();
-                        if (json.has("words_result")) {
-                            JSONArray wordsArray = json.getJSONArray("words_result");
-                            for (int i = 0; i < wordsArray.length(); i++) {
-                                JSONObject obj = wordsArray.getJSONObject(i);
-                                sb.append(obj.getString("words"));
-                                if (i < wordsArray.length() - 1) sb.append("，");
-                            }
-                        } else if (json.has("error_msg")) {
-                            String errorMsg = json.getString("error_msg");
-                            sb.append("识别失败: ").append(errorMsg);
-                            Log.e("OCR_DEBUG", "百度API返回错误: " + errorMsg);
-                        } else {
-                            sb.append("未识别到可用结果");
-                        }
-                        String sentence = sb.toString();
-                        Log.d("OCR_DEBUG", "解析后的句子: " + sentence);
-                        Toast.makeText(VideoActivity_pi.this, sentence, Toast.LENGTH_LONG).show();
-                    } catch (Exception e) {
-                        Log.e("OCR_DEBUG", "解析JSON时出错", e);
-                        Toast.makeText(VideoActivity_pi.this, "解析出错：" + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                });
+                Log.d("OCR_DEBUG", "上传成功 JSON: " + resultJson);
             }
 
             @Override
             public void onError(String errorMessage) {
-                Log.e("OCR_DEBUG", "onError: 收到错误回调: " + errorMessage);
-                runOnUiThread(() -> Toast.makeText(VideoActivity_pi.this, "上传失败：" + errorMessage, Toast.LENGTH_LONG).show());
+                Log.e("OCR_DEBUG", "上传失败: " + errorMessage);
             }
         });
     }
@@ -406,7 +415,7 @@ public class VideoActivity_pi extends AppCompatActivity {
         if (webView != null) webView.destroy();
         if (udpDiscoverThread != null && udpDiscoverThread.isAlive()) udpDiscoverThread.interrupt();
         if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
-        // 删除移除 Runnable 的调用
-        // detectHandler.removeCallbacks(detectRunnable);
+        detectHandler.removeCallbacks(detectRunnable);
+        TTSPlayer.shutdown();
     }
 }
