@@ -154,18 +154,18 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     }
 
     // 处理用户语音输入的导航相关逻辑
-    public void handleUserVoiceInput(String text) {
+    public boolean handleUserVoiceInput(String text) {
         Log.d("NavigationActivity", "handleUserVoiceInput: 收到语音文本=" + text + ", currentPhase=" + currentPhase + ", isWaitingForDestination=" + isWaitingForDestination + ", isAskingForDestinationChoice=" + isAskingForDestinationChoice);
         // 检查退出导航命令
         if (isExitNavigationCommand(text)) {
             handleExitNavigation();
-            return;
+            return true;
         }
 
         // 多轮目的地选择
         if (isAskingForDestinationChoice) {
             handleDestinationChoiceResponse(text);
-            return;
+            return true;
         }
 
         // 目的地确认
@@ -182,21 +182,25 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                     isWaitingForDestination = false;
                     pendingDestination = null;
                 }
+                return true;
             } else if (isNo(text)) {
                 // 用户拒绝目的地
                 currentPhase = NavigationPhase.IDLE;
                 patrickAI.speak("好的，请重新告诉我你要去哪里");
                 isWaitingForDestination = false;
                 pendingDestination = null;
-            } else {
-                // 用户说了新的目的地
-                processPotentialDestination(text);
+                return true;
             }
-            return;
         }
-
-        // 正常状态，检查是否为目的地输入
-        processPotentialDestination(text);
+        boolean handledByNavigation = processPotentialDestination(text);
+        if (handledByNavigation){
+            return true;
+        }
+        if (currentPhase == NavigationPhase.IDLE || currentPhase == NavigationPhase.NAVIGATION_STARTED){
+            patrickAI.handleGeneralQuery(text);
+            return true;
+        }
+        return false;
     }
 
     // 判断确认
@@ -275,11 +279,11 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     }
 
     // 处理可能的目的地输入
-    private void processPotentialDestination(String text) {
+    private boolean processPotentialDestination(String text) {
         Log.d("NavigationActivity", "processPotentialDestination: text=" + text);
         String[] nonLocationWords = {"你好", "再见", "谢谢", "天气", "时间", "今天", "明天", "什么", "怎么", "为什么"};
         for (String word : nonLocationWords) {
-            if (text.contains(word)) return;
+            if (text.contains(word)) return false;
         }
         if (text.contains("去") || text.contains("到") || text.contains("找") ||
                 text.contains("导航") || text.contains("路线") ||
@@ -292,8 +296,10 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 pendingDestination = destination;
                 isWaitingForDestination = true;
                 patrickAI.speak("你是要去" + destination + "吗？");
+                return true;
             }
         }
+        return false;
     }
 
     // 从用户输入中提取目的地
@@ -730,23 +736,28 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     private void playNavigationVoice(String naviText) {
         Log.d("NavigationActivity", "playNavigationVoice: naviText=" + naviText + ", isNaviSpeaking=" + isNaviSpeaking);
         isNaviSpeaking = true;
+
+        // 【关键修改点：使用新的并发接口】
         if (patrickAI != null) {
-            patrickAI.pauseListening();
+            // 1. 告知引擎当前正在播报导航，不暂停识别
+            patrickAI.setNaviSpeaking(true, naviText);
+
+            // 2. 使用 speakWithoutPausing，它不控制 ASR 状态
+            patrickAI.speakWithoutPausing("导航提示：" + naviText, () -> {
+                // TTS 完毕回调：
+                isNaviSpeaking = false;
+                try { patrickAI.setNaviSpeaking(false, null); } catch (Exception ignored) {}
+
+                // 3. 检查队列，留一个短暂停顿来间隔播报下一条
+                ttsHandler.postDelayed(() -> {
+                    if (!naviVoiceQueue.isEmpty()) {
+                        String nextNaviText = naviVoiceQueue.poll();
+                        playNavigationVoice(nextNaviText);
+                    }
+                }, 300); // 300ms 间隔足够
+            });
         }
-        patrickAI.speak("导航提示：" + naviText);
-        int speakDuration = Math.max(4000, naviText.length() * 150);
-        ttsHandler.postDelayed(() -> {
-            isNaviSpeaking = false;
-            ttsHandler.postDelayed(() -> {
-                if (patrickAI != null) {
-                    patrickAI.resumeListening();
-                }
-            }, 800);
-            if (!naviVoiceQueue.isEmpty()) {
-                String nextNaviText = naviVoiceQueue.poll();
-                playNavigationVoice(nextNaviText);
-            }
-        }, speakDuration);
+        // 移除旧的手动 pauseListening 和 resumeListening 逻辑
     }
 
     private boolean isExitNavigationCommand(String text) {
