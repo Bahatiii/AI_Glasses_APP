@@ -731,22 +731,16 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         Log.d("NavigationActivity", "playNavigationVoice: naviText=" + naviText + ", isNaviSpeaking=" + isNaviSpeaking);
         isNaviSpeaking = true;
         if (patrickAI != null) {
-            patrickAI.pauseListening();
-        }
-        patrickAI.speak("导航提示：" + naviText);
-        int speakDuration = Math.max(4000, naviText.length() * 150);
-        ttsHandler.postDelayed(() -> {
-            isNaviSpeaking = false;
-            ttsHandler.postDelayed(() -> {
-                if (patrickAI != null) {
-                    patrickAI.resumeListening();
+            patrickAI.speak("导航提示：" + naviText, () -> {
+                isNaviSpeaking = false;
+                // 导航播报完毕后自动恢复监听（由 speak 内部完成）
+                // 继续播报下一个导航语音
+                if (!naviVoiceQueue.isEmpty()) {
+                    String nextNaviText = naviVoiceQueue.poll();
+                    playNavigationVoice(nextNaviText);
                 }
-            }, 800);
-            if (!naviVoiceQueue.isEmpty()) {
-                String nextNaviText = naviVoiceQueue.poll();
-                playNavigationVoice(nextNaviText);
-            }
-        }, speakDuration);
+            });
+        }
     }
 
     private boolean isExitNavigationCommand(String text) {
@@ -783,20 +777,22 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
         if (etSearch != null) etSearch.setText("");
         if (lvTips != null) lvTips.setVisibility(View.GONE);
         if (searchBarContainer != null) searchBarContainer.setVisibility(View.GONE);
-        patrickAI.speak("好的，已退出导航模式，正在返回AI聊天模式");
-        new Handler().postDelayed(() -> {
-            // 先彻底释放导航页面的识别器，避免与聊天页面竞争音频资源
+
+        // 使用speak的回调来确保播报完毕再跳转
+        patrickAI.speak("好的，已退出导航模式，正在返回AI聊天模式", () -> {
+            // 这个回调在TTS播报完毕后执行
             try {
                 if (patrickAI != null) {
-                    patrickAI.destroy(); // ← 新增
+                    // 销毁当前页面的引擎
+                    patrickAI.destroy();
                 }
             } catch (Exception ignored) {}
+
             Intent intent = new Intent(NavigationActivity.this, AIChatActivity.class);
             intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             intent.putExtra("from_navigation", true);
             startActivity(intent);
             finish();
-            // 不需要 patrickAI.resumeListening();
-        }, 1500);
+        });
     }
 }

@@ -49,7 +49,10 @@ public class PatrickAIEngine {
 
         if (state == State.THINKING) {
             Log.d("PatrickAIEngine", "AI正在思考，暂存新输入: " + text);
-            speak("我正在思考，请稍等...");
+            pauseListening();
+            new android.os.Handler().postDelayed(() -> {
+                speak("我正在思考，请稍等...");
+            }, 100); // 在speak本身的延时之外，再加一个保护性延时
             return;
         }
 
@@ -135,7 +138,7 @@ public class PatrickAIEngine {
         Log.d("PatrickAIEngine", "speak: " + text + ", state=" + state);
         speak(text, null);
     }
-    private void speak(String text, Runnable onDone) {
+    public void speak(String text, Runnable onDone) {
         Log.d("PatrickAIEngine", "speak: " + text + ", state=" + state);
         uiCallback.accept("Patrick: " + text);
         Log.d("PatrickAIEngine", "TTS播报前暂停语音识别，state=" + state);
