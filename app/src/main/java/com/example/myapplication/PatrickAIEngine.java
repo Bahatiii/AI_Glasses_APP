@@ -172,9 +172,9 @@ public class PatrickAIEngine {
         // 新增：为AI设定角色和回复要求
         String prompt = "你是一个名为Patrick的AI眼镜助手。请以这个身份，用自然的语言回答以下问题，回答内容不要过长" + input;
 
-        GLMApiClient glmApi = new GLMApiClient();
+        DeepSeekApiClient deepseekApi = new DeepSeekApiClient();
         // 使用包装后的 prompt 进行请求
-        glmApi.chatCompletion(prompt, new okhttp3.Callback() {
+        deepseekApi.chatCompletion(prompt, new okhttp3.Callback() {
             @Override
             public void onFailure(okhttp3.Call call, java.io.IOException e) {
                 callback.accept("AI请求失败：" + e.getMessage());
