@@ -43,8 +43,13 @@ public class PatrickAIEngine {
         uiCallback.accept("你: " + text);
 
         if (context instanceof NavigationActivity) {
-            ((NavigationActivity) context).handleUserVoiceInput(text);
-            return;
+            try {
+                boolean handled = ((NavigationActivity) context).handleUserVoiceInput(text);
+                if (handled) return;
+                // if not handled by navigation, continue to AI processing
+            } catch (Exception e) {
+                Log.e("PatrickAIEngine", "调用 NavigationActivity.handleUserVoiceInput 异常: " + e.getMessage());
+            }
         }
 
         if (state == State.THINKING) {
@@ -160,11 +165,29 @@ public class PatrickAIEngine {
     private void openNavigation() {
         Log.d("PatrickAIEngine", "openNavigation: 跳转导航界面，暂停AI语音监听");
         pauseListening(); // 新增：暂停AI语音识别
-        context.startActivity(new android.content.Intent(context, NavigationActivity.class));
+        try {
+            android.content.Context ctx = context;
+            android.content.Intent intent = new android.content.Intent(ctx, NavigationActivity.class);
+            if (!(ctx instanceof android.app.Activity)) {
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            ctx.startActivity(intent);
+        } catch (Exception e) {
+            Log.e("PatrickAIEngine", "openNavigation 启动 NavigationActivity 失败: " + e.getMessage());
+        }
     }
     // 打开视频
     private void openVideo() {
-        context.startActivity(new android.content.Intent(context, VideoActivity_pi.class));
+        try {
+            android.content.Context ctx = context;
+            android.content.Intent intent = new android.content.Intent(ctx, VideoActivity_pi.class);
+            if (!(ctx instanceof android.app.Activity)) {
+                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            ctx.startActivity(intent);
+        } catch (Exception e) {
+            Log.e("PatrickAIEngine", "openVideo 启动 VideoActivity_pi 失败: " + e.getMessage());
+        }
     }
 
     // 智谱API调用
@@ -315,7 +338,7 @@ public class PatrickAIEngine {
         startListening();
     }
 
-    private String parseIflytekResult(String json) {
+    public static String parseIflytekResult(String json) {
         try {
             JSONObject resultJson = new JSONObject(json);
             JSONArray wsArray = resultJson.getJSONArray("ws");

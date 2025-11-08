@@ -89,22 +89,30 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // 进入前先销毁旧的 engine（保险起见）
-        if (patrickAI != null) {
-            patrickAI.destroy();
-            patrickAI = null;
+        try {
+            // 进入前先销毁旧的 engine（保险起见）
+            if (patrickAI != null) {
+                patrickAI.destroy();
+                patrickAI = null;
+            }
+            SpeechUtility.createUtility(this, "appid=9be1e7dc");
+            MapsInitializer.updatePrivacyShow(this, true, true);
+            MapsInitializer.updatePrivacyAgree(this, true);
+            setContentView(R.layout.activity_navigation);
+
+            // 初始化 PatrickAIEngine
+            patrickAI = new PatrickAIEngine(this, text -> runOnUiThread(() -> showPatrickSpeak(text)));
+
+            // 找到布局控件
+            mAMapNaviView = findViewById(R.id.navi_view);
+            if (mAMapNaviView != null) mAMapNaviView.onCreate(savedInstanceState);
+        } catch (Exception e) {
+            Log.e("NavigationActivity", "onCreate 初始化失败: " + e.getMessage(), e);
+            Toast.makeText(this, "导航初始化失败: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            // 结束当前 Activity，避免崩溃循环
+            finish();
+            return;
         }
-        SpeechUtility.createUtility(this, "appid=9be1e7dc");
-        MapsInitializer.updatePrivacyShow(this, true, true);
-        MapsInitializer.updatePrivacyAgree(this, true);
-        setContentView(R.layout.activity_navigation);
-
-        // 初始化 PatrickAIEngine
-        patrickAI = new PatrickAIEngine(this, text -> runOnUiThread(() -> showPatrickSpeak(text)));
-
-        // 找到布局控件
-        mAMapNaviView = findViewById(R.id.navi_view);
-        mAMapNaviView.onCreate(savedInstanceState);
 
         etSearch = findViewById(R.id.et_search);
         searchBarContainer = findViewById(R.id.search_bar_container);
@@ -128,7 +136,11 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
 
         // Patrick进入导航模式的欢迎语
         new Handler().postDelayed(() -> {
-            patrickAI.speak("已进入导航模式，请告诉我你要去哪里，或者你可以直接在搜索框输入目的地。如需退出导航，可以说退出导航");
+            if (patrickAI != null) {
+                patrickAI.speak("已进入导航模式，请告诉我你要去哪里，或者你可以直接在搜索框输入目的地。如需退出导航，可以说退出导航");
+            } else {
+                Log.w("NavigationActivity", "延迟导航欢迎语时 patrickAI 为 null，跳过播报");
+            }
         }, 1000);
     }
 
@@ -154,18 +166,19 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     }
 
     // 处理用户语音输入的导航相关逻辑
-    public void handleUserVoiceInput(String text) {
+    // 返回 true 表示导航已处理该文本，false 表示未处理（可交给 AI 引擎）
+    public boolean handleUserVoiceInput(String text) {
         Log.d("NavigationActivity", "handleUserVoiceInput: 收到语音文本=" + text + ", currentPhase=" + currentPhase + ", isWaitingForDestination=" + isWaitingForDestination + ", isAskingForDestinationChoice=" + isAskingForDestinationChoice);
         // 检查退出导航命令
         if (isExitNavigationCommand(text)) {
             handleExitNavigation();
-            return;
+            return true;
         }
 
         // 多轮目的地选择
         if (isAskingForDestinationChoice) {
             handleDestinationChoiceResponse(text);
-            return;
+            return true;
         }
 
         // 目的地确认
@@ -190,13 +203,15 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 pendingDestination = null;
             } else {
                 // 用户说了新的目的地
-                processPotentialDestination(text);
+                boolean handled = processPotentialDestination(text);
+                if (handled) return true;
             }
-            return;
+            return true;
         }
 
         // 正常状态，检查是否为目的地输入
-        processPotentialDestination(text);
+        boolean handled = processPotentialDestination(text);
+        return handled;
     }
 
     // 判断确认
@@ -275,11 +290,12 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
     }
 
     // 处理可能的目的地输入
-    private void processPotentialDestination(String text) {
+    // 返回 true 表示导航已处理该文本（识别为目的地或触发了导航相关行为）
+    private boolean processPotentialDestination(String text) {
         Log.d("NavigationActivity", "processPotentialDestination: text=" + text);
         String[] nonLocationWords = {"你好", "再见", "谢谢", "天气", "时间", "今天", "明天", "什么", "怎么", "为什么"};
         for (String word : nonLocationWords) {
-            if (text.contains(word)) return;
+            if (text.contains(word)) return false;
         }
         if (text.contains("去") || text.contains("到") || text.contains("找") ||
                 text.contains("导航") || text.contains("路线") ||
@@ -292,8 +308,10 @@ public class NavigationActivity extends AppCompatActivity implements AMapNaviLis
                 pendingDestination = destination;
                 isWaitingForDestination = true;
                 patrickAI.speak("你是要去" + destination + "吗？");
+                return true;
             }
         }
+        return false;
     }
 
     // 从用户输入中提取目的地
