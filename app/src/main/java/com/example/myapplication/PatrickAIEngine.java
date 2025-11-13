@@ -43,9 +43,23 @@ public class PatrickAIEngine {
         uiCallback.accept("你: " + text);
 
         if (context instanceof NavigationActivity) {
-            ((NavigationActivity) context).handleUserVoiceInput(text);
-            return;
+            try {
+                ((NavigationActivity) context).handleUserVoiceInput(text);
+            } catch (Exception e) {
+                Log.e("PatrickAIEngine", "调用 NavigationActivity.handleUserVoiceInput 异常: " + e.getMessage());
+            }
         }
+        // 支持视频界面的视觉查询触发（如“这是什么/画面是什么/现在前面是什么”）
+        try {
+            if (context != null && context.getClass().getSimpleName().equals("VideoActivity_pi")) {
+                try {
+                    boolean handled = ((com.example.myapplication.VideoActivity_pi) context).handleUserVoiceInput(text);
+                    if (handled) return;
+                } catch (Exception e) {
+                    Log.e("PatrickAIEngine", "调用 VideoActivity_pi.handleUserVoiceInput 异常: " + e.getMessage());
+                }
+            }
+        } catch (Exception ignored) {}
 
         if (state == State.THINKING) {
             Log.d("PatrickAIEngine", "AI正在思考，暂存新输入: " + text);
