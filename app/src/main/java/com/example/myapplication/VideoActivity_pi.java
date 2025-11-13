@@ -79,22 +79,34 @@ public class VideoActivity_pi extends AppCompatActivity {
                         public void onSuccess(String resultJson) {
                             Log.d("VideoActivity_pi", "✅ 百度识别返回 JSON: " + resultJson);
                             try {
-                                JSONObject json = new JSONObject(resultJson);
-                                JSONObject vehicleNum = json.optJSONObject("vehicle_num");
-                                if (vehicleNum == null) {
-                                    Log.d("VideoActivity_pi", "🚫 未识别到车辆字段");
-                                    return;
-                                }
+                                JSONObject json = new JSONObject(resultJson); // ✅ 保留这一行
 
-                                int car = vehicleNum.optInt("car", 0);
-                                int truck = vehicleNum.optInt("truck", 0);
-                                int bus = vehicleNum.optInt("bus", 0);
-                                int motorbike = vehicleNum.optInt("motorbike", 0);
-                                int tricycle = vehicleNum.optInt("tricycle", 0);
+                                // 设置置信度阈值
+                                double CONF_THRESHOLD = 0.8;
+
+                                JSONArray vehicleList = json.optJSONArray("vehicle_list");
+                                int car = 0, truck = 0, bus = 0, motorbike = 0, tricycle = 0;
+
+                                if (vehicleList != null) {
+                                    for (int i = 0; i < vehicleList.length(); i++) {
+                                        JSONObject v = vehicleList.getJSONObject(i);
+                                        double score = v.optDouble("score", 0);
+                                        String type = v.optString("type", "");
+                                        if (score >= CONF_THRESHOLD) {
+                                            switch (type) {
+                                                case "car": car++; break;
+                                                case "truck": truck++; break;
+                                                case "bus": bus++; break;
+                                                case "motorbike": motorbike++; break;
+                                                case "tricycle": tricycle++; break;
+                                            }
+                                        }
+                                    }
+                                }
 
                                 int total = car + truck + bus + motorbike + tricycle;
                                 if (total == 0) {
-                                    Log.d("VideoActivity_pi", "🚫 未检测到车辆，不播报");
+                                    Log.d("VideoActivity_pi", "🚫 未检测到高置信度车辆，不播报");
                                     return;
                                 }
 
@@ -121,6 +133,7 @@ public class VideoActivity_pi extends AppCompatActivity {
                                 Log.e("VideoActivity_pi", "❌ 解析百度返回 JSON 出错: " + e.getMessage());
                             }
                         }
+
 
                         @Override
                         public void onError(String errorMessage) {
