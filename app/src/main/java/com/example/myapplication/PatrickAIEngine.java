@@ -22,9 +22,6 @@ public class PatrickAIEngine {
     private SpeechRecognizer speechRecognizer;
     private boolean isListening = false;
     private Queue<String> pendingInputs = new LinkedList<>();
-    // 标记当前是否为导航播报期间，若为 true 则识别到与导航播报相同的文本将被过滤
-    private volatile boolean naviSpeaking = false;
-    private volatile String lastNaviText = null;
 
     public PatrickAIEngine(Context context, Consumer<String> uiCallback) {
         this.context = context;
@@ -47,17 +44,29 @@ public class PatrickAIEngine {
 
         if (context instanceof NavigationActivity) {
             try {
-                boolean handled = ((NavigationActivity) context).handleUserVoiceInput(text);
-                if (handled) return;
-                // 如果导航未处理，则继续后续的 AI 流程
+                ((NavigationActivity) context).handleUserVoiceInput(text);
             } catch (Exception e) {
                 Log.e("PatrickAIEngine", "调用 NavigationActivity.handleUserVoiceInput 异常: " + e.getMessage());
             }
         }
+        // 支持视频界面的视觉查询触发（如“这是什么/画面是什么/现在前面是什么”）
+        try {
+            if (context != null && context.getClass().getSimpleName().equals("VideoActivity_pi")) {
+                try {
+                    boolean handled = ((com.example.myapplication.VideoActivity_pi) context).handleUserVoiceInput(text);
+                    if (handled) return;
+                } catch (Exception e) {
+                    Log.e("PatrickAIEngine", "调用 VideoActivity_pi.handleUserVoiceInput 异常: " + e.getMessage());
+                }
+            }
+        } catch (Exception ignored) {}
 
         if (state == State.THINKING) {
             Log.d("PatrickAIEngine", "AI正在思考，暂存新输入: " + text);
-            speak("我正在思考，请稍等...");
+            pauseListening();
+            new android.os.Handler().postDelayed(() -> {
+                speak("我正在思考，请稍等...");
+            }, 100); // 在speak本身的延时之外，再加一个保护性延时
             return;
         }
 
@@ -143,22 +152,9 @@ public class PatrickAIEngine {
         Log.d("PatrickAIEngine", "speak: " + text + ", state=" + state);
         speak(text, null);
     }
-    private void speak(String text, Runnable onDone) {
+    public void speak(String text, Runnable onDone) {
         Log.d("PatrickAIEngine", "speak: " + text + ", state=" + state);
-        // Safely invoke UI callback on main thread if available
-        try {
-            if (uiCallback != null) {
-                if (context instanceof android.app.Activity) {
-                    ((android.app.Activity) context).runOnUiThread(() -> {
-                        try { uiCallback.accept("Patrick: " + text); } catch (Exception ignored) {}
-                    });
-                } else {
-                    try { uiCallback.accept("Patrick: " + text); } catch (Exception ignored) {}
-                }
-            }
-        } catch (Exception e) {
-            Log.e("PatrickAIEngine", "speak: uiCallback 调用异常: " + e.getMessage());
-        }
+        uiCallback.accept("Patrick: " + text);
         Log.d("PatrickAIEngine", "TTS播报前暂停语音识别，state=" + state);
         pauseListening();
         TTSHelper.speak(text, () -> {
@@ -186,9 +182,13 @@ public class PatrickAIEngine {
     }
 
     // 智谱API调用
-    private void callAI(String input, Consumer<String> callback) {
-        GLMApiClient glmApi = new GLMApiClient();
-        glmApi.chatCompletion(input, new okhttp3.Callback() {
+    public void callAI(String input, Consumer<String> callback) {
+        // 新增：为AI设定角色和回复要求
+        String prompt = "你是一个名为Patrick的AI眼镜助手。请以这个身份，用自然的语言回答以下问题，回答内容不要过长" + input;
+
+        DeepSeekApiClient deepseekApi = new DeepSeekApiClient();
+        // 使用包装后的 prompt 进行请求
+        deepseekApi.chatCompletion(prompt, new okhttp3.Callback() {
             @Override
             public void onFailure(okhttp3.Call call, java.io.IOException e) {
                 callback.accept("AI请求失败：" + e.getMessage());
@@ -259,89 +259,6 @@ public class PatrickAIEngine {
                 speechRecognizer = null;
             }
         }
-    }
-
-    // 当导航播报时，NavigationActivity 可以调用此方法让引擎忽略由导航播报产生的回音文本
-    public void setNaviSpeaking(boolean speaking, String naviText) {
-        this.naviSpeaking = speaking;
-        this.lastNaviText = naviText;
-    }
-
-    // 新：在不暂停识别的情况下进行 TTS 播报（用于导航播报，以便保持识别持续运行）
-    public void speakWithoutPausing(String text) {
-        speakWithoutPausing(text, null);
-    }
-
-    public void speakWithoutPausing(String text, Runnable onDone) {
-        try {
-            Log.d("PatrickAIEngine", "speakWithoutPausing: " + text + ", naviSpeaking=" + naviSpeaking);
-            // Safely invoke UI callback on main thread if available
-            try {
-                if (uiCallback != null) {
-                    if (context instanceof android.app.Activity) {
-                        ((android.app.Activity) context).runOnUiThread(() -> {
-                            try { uiCallback.accept("Patrick: " + text); } catch (Exception ignored) {}
-                        });
-                    } else {
-                        try { uiCallback.accept("Patrick: " + text); } catch (Exception ignored) {}
-                    }
-                }
-            } catch (Exception e) {
-                Log.e("PatrickAIEngine", "speakWithoutPausing: uiCallback 调用异常: " + e.getMessage());
-            }
-            // 直接触发 TTS，但不在此暂停或恢复识别
-            TTSHelper.speak(text, () -> {
-                try {
-                    if (onDone != null) onDone.run();
-                } catch (Exception ignored) {}
-            });
-        } catch (Exception e) {
-            Log.e("PatrickAIEngine", "speakWithoutPausing 异常: " + e.getMessage());
-            if (onDone != null) onDone.run();
-        }
-    }
-
-    public void handleGeneralQuery(String text){
-        Log.d("PatrickAIEngine", "handleGeneralQuery: 收到通用问答文本=" + text);
-
-        if (state == State.THINKING) {
-            Log.d("PatrickAIEngine", "AI正在思考，暂存新输入: " + text);
-            // 这里将输入排队，以便AI处理完当前任务后继续处理
-            pendingInputs.offer(text);
-            speak("我正在处理上一个问题，请稍等...");
-            return;
-        }
-
-        if (state == State.SPEAKING) {
-            Log.d("PatrickAIEngine", "AI正在播报，打断TTS并恢复识别。");
-            TTSHelper.stop();
-            // 在通用对话中，我们通常期望打断后立即处理新输入
-            resumeListening();
-        }
-
-        // 2. 忽略重复输入
-        if (isRepeat(text)) {
-            Log.d("PatrickAIEngine", "重复输入，忽略。");
-            return;
-        }
-
-        // 3. 核心逻辑：调用通用AI接口
-        Log.d("PatrickAIEngine", "通用问答，调用AI接口，state变更前=" + state);
-        state = State.THINKING; // 标记AI正在处理
-        Log.d("PatrickAIEngine", "state变更后=" + state);
-
-        // 调用您已有的 callAI 逻辑
-        callAI(text, result -> {
-            Log.d("PatrickAIEngine", "AI回复=" + result + ", state=" + state);
-            speak(result, () -> {
-                // 播报完毕后处理队列里的新输入
-                if (!pendingInputs.isEmpty()) {
-                    String nextInput = pendingInputs.poll();
-                    // 这里可以直接调用 onInput 来重新进入流程，让它再次分流
-                    onInput(nextInput);
-                }
-            });
-        });
     }
 
     // 新：彻底销毁识别器与释放资源
@@ -436,27 +353,6 @@ public class PatrickAIEngine {
             String text = parseIflytekResult(json);
             Log.d("PatrickAIEngine", "RecognizerListener.onResult: 解析后文本: " + text);
             if (text != null && !text.trim().isEmpty()) {
-                // 如果当前处于导航播报期间，且识别到的文本与导航播报文本高度相似或包含“导航提示”，则认为这是导航回音，忽略它
-                if (naviSpeaking) {
-                    String lower = text.toLowerCase();
-                    boolean appearsLikeNavi = false;
-                    if (lastNaviText != null && !lastNaviText.trim().isEmpty()) {
-                        String lastLower = lastNaviText.toLowerCase();
-                        if (lower.contains(lastLower) || lastLower.contains(lower)) appearsLikeNavi = true;
-                    }
-                    if (lower.contains("导航提示") || lower.contains("导航")) appearsLikeNavi = true;
-                    if (appearsLikeNavi) {
-                        Log.d("PatrickAIEngine", "RecognizerListener: 忽略导航回音: " + text);
-                        // 不把这条作为用户输入处理
-                        // 但继续监听会话（不阻止后续识别）
-                        if (isLast) {
-                            isListening = false;
-                            Log.d("PatrickAIEngine", "RecognizerListener: 会话结束（导航回音），自动继续监听, isListening=" + isListening);
-                            startListening();
-                        }
-                        return;
-                    }
-                }
                 onInput(text);
             }
             if (isLast) {
