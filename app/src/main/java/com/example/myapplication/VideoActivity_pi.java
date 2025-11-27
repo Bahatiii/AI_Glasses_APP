@@ -38,6 +38,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class VideoActivity_pi extends AppCompatActivity {
+    private PatrickAIEngine patrickAI;
 
     private WebView webView;
     private TextView tvStatus;
@@ -56,7 +57,7 @@ public class VideoActivity_pi extends AppCompatActivity {
 
     // ========== 自动检测 + 播报部分 ==========
     private final Handler detectHandler = new Handler(Looper.getMainLooper());
-    private static final long AUTO_DETECT_INTERVAL_MS = 5000; // 每5秒检测一次
+    private static final long AUTO_DETECT_INTERVAL_MS = 15000; // 每15秒检测一次
     private static final long SPEAK_INTERVAL_MS = 8000; // 最小播报间隔
     private long lastSpeakTime = 0;
 
@@ -142,6 +143,24 @@ public class VideoActivity_pi extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_video);
 
+        // 初始化 PatrickAIEngine（与 Navigation/AIChat 的初始化风格相同）
+        try {
+            patrickAI = new PatrickAIEngine(this, text -> runOnUiThread(() -> {
+                // 将 AI 的 UI 输出追加到状态栏，便于调试与查看
+                if (tvStatus != null) tvStatus.append(text + "\n");
+                Log.d("VideoActivity_pi", "Patrick UI: " + text);
+            }));
+            // 延迟启动欢迎语，确保 TTS 就绪
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (patrickAI != null) {
+                    patrickAI.speak("已进入视频模式，可以向我提问或直接用语音交互");
+                }
+            }, 800);
+            patrickAI.startListening();
+        } catch (Exception e) {
+            Log.e("VideoActivity_pi", "初始化 PatrickAIEngine 失败: " + e.getMessage(), e);
+        }
+
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
@@ -215,7 +234,7 @@ public class VideoActivity_pi extends AppCompatActivity {
                 finish();
             }
         };
-        getOnBackPressedDispatcher().addCallback(this, callback);
+        getOnBackPressedDispatcher().addCallback(callback);
     }
 
     private void discoverRaspberryPi() {
@@ -399,6 +418,14 @@ public class VideoActivity_pi extends AppCompatActivity {
             @Override
             public void onSuccess(String resultJson) {
                 Log.d("OCR_DEBUG", "上传成功 JSON: " + resultJson);
+                // 将图片识别结果转发给 PatrickAI 做后续对话（保持原有上传日志）
+                try {
+                    if (patrickAI != null) {
+                        patrickAI.onInput("图片识别结果：" + resultJson);
+                    }
+                } catch (Exception e) {
+                    Log.e("VideoActivity_pi", "转发图片识别给 PatrickAI 失败: " + e.getMessage());
+                }
             }
 
             @Override
@@ -417,5 +444,148 @@ public class VideoActivity_pi extends AppCompatActivity {
         if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
         detectHandler.removeCallbacks(detectRunnable);
         TTSPlayer.shutdown();
+        // 销毁/释放 Patrick 引擎，避免内存泄漏
+        try {
+            if (patrickAI != null) {
+                patrickAI.destroy();
+                patrickAI = null;
+            }
+        } catch (Exception e) {
+            Log.e("VideoActivity_pi", "销毁 PatrickAIEngine 失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        try {
+            if (patrickAI != null) patrickAI.pauseListening();
+        } catch (Exception e) {
+            Log.e("VideoActivity_pi", "onPause patrickAI pause 失败: " + e.getMessage());
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        try {
+            if (patrickAI != null) patrickAI.startListening();
+        } catch (Exception e) {
+            Log.e("VideoActivity_pi", "onResume patrickAI startListening 失败: " + e.getMessage());
+        }
+    }
+
+    public boolean handleUserVoiceInput(String text) {
+        if (text == null) return false;
+        String t = text.trim();
+        if (t.contains("这是什么") || t.contains("画面是什么") || t.contains("现在前面是什么") || t.contains("前面是什么") || t.contains("这是谁") || t.contains("识别一下")) {
+            performVisualRecognition(t);
+            return true;
+        }
+        return false;
+    }
+
+    // 执行一次性视觉识别：先尝试交通/目标检测（BaiduTraffic），若未检测到车辆则回退到图片 OCR（BaiduImageUploader）
+    private void performVisualRecognition(String userQuery) {
+        try {
+            if (webView == null || webView.getWidth() == 0 || webView.getHeight() == 0) {
+                if (patrickAI != null) patrickAI.speak("当前画面不可用，无法识别");
+                return;
+            }
+            Bitmap bitmap = Bitmap.createBitmap(webView.getWidth(), webView.getHeight(), Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            webView.draw(canvas);
+
+            // 先做交通/目标检测（更适合询问前面有什么车）
+            BaiduTraffic.detectTraffic(bitmap, new BaiduTraffic.TrafficCallback() {
+                @Override
+                public void onSuccess(String resultJson) {
+                    try {
+                        JSONObject json = new JSONObject(resultJson);
+                        JSONObject vehicleNum = json.optJSONObject("vehicle_num");
+                        int total = 0;
+                        if (vehicleNum != null) {
+                            int car = vehicleNum.optInt("car", 0);
+                            int truck = vehicleNum.optInt("truck", 0);
+                            int bus = vehicleNum.optInt("bus", 0);
+                            int motorbike = vehicleNum.optInt("motorbike", 0);
+                            int tricycle = vehicleNum.optInt("tricycle", 0);
+                            total = car + truck + bus + motorbike + tricycle;
+                            if (total > 0) {
+                                StringBuilder sb = new StringBuilder();
+                                sb.append("识别到 ").append(total).append(" 辆车辆，");
+                                if (car > 0) sb.append(car).append(" 辆小汽车，");
+                                if (truck > 0) sb.append(truck).append(" 辆卡车，");
+                                if (bus > 0) sb.append(bus).append(" 辆公交车，");
+                                if (motorbike > 0) sb.append(motorbike).append(" 辆摩托车，");
+                                if (tricycle > 0) sb.append(tricycle).append(" 辆三轮车，");
+                                String speakText = sb.toString();
+                                if (speakText.endsWith("，")) speakText = speakText.substring(0, speakText.length()-1);
+                                if (patrickAI != null) {
+                                    patrickAI.speak("我看到：" + speakText);
+                                    patrickAI.onInput("图片识别结果：" + resultJson);
+                                } else {
+                                    TTSPlayer.speak("我看到：" + speakText);
+                                }
+                                return;
+                            }
+                        }
+
+                        BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
+                            @Override
+                            public void onSuccess(String ocrJson) {
+                                try {
+                                    if (patrickAI != null) {
+                                        patrickAI.speak("识别结果已返回，请稍等片刻，我正在帮你理解");
+                                        patrickAI.onInput("图片识别结果：" + ocrJson);
+                                    } else {
+                                        TTSPlayer.speak("识别结果：" + ocrJson);
+                                    }
+                                } catch (Exception e) {
+                                    Log.e("VideoActivity_pi", "performVisualRecognition OCR 回调处理失败: " + e.getMessage());
+                                }
+                            }
+
+                            @Override
+                            public void onError(String errorMessage) {
+                                Log.e("VideoActivity_pi", "performVisualRecognition OCR 失败: " + errorMessage);
+                                if (patrickAI != null) patrickAI.speak("图像识别失败：" + errorMessage);
+                                else TTSPlayer.speak("图像识别失败");
+                            }
+                        });
+                    } catch (Exception e) {
+                        Log.e("VideoActivity_pi", "performVisualRecognition 解析 traffic 结果失败: " + e.getMessage());
+                        if (patrickAI != null) patrickAI.speak("识别失败：" + e.getMessage());
+                    }
+                }
+
+                @Override
+                public void onError(String errorMessage) {
+                    Log.e("VideoActivity_pi", "performVisualRecognition traffic 失败: " + errorMessage);
+                    // 当流量检测失败时，退回到 OCR
+                    BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
+                        @Override
+                        public void onSuccess(String ocrJson) {
+                            if (patrickAI != null) {
+                                patrickAI.speak("识别结果已返回，我已转发给AI进行理解。");
+                                patrickAI.onInput("图片识别结果：" + ocrJson);
+                            } else {
+                                TTSPlayer.speak("识别结果：" + ocrJson);
+                            }
+                        }
+
+                        @Override
+                        public void onError(String errorMessage2) {
+                            Log.e("VideoActivity_pi", "performVisualRecognition OCR 失败: " + errorMessage2);
+                            if (patrickAI != null) patrickAI.speak("图像识别失败：" + errorMessage2);
+                            else TTSPlayer.speak("图像识别失败");
+                        }
+                    });
+                }
+            });
+        } catch (Exception e) {
+            Log.e("VideoActivity_pi", "performVisualRecognition 异常: " + e.getMessage());
+            if (patrickAI != null) patrickAI.speak("识别发生异常：" + e.getMessage());
+        }
     }
 }

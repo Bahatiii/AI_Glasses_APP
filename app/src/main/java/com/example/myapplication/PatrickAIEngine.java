@@ -44,13 +44,22 @@ public class PatrickAIEngine {
 
         if (context instanceof NavigationActivity) {
             try {
-                boolean handled = ((NavigationActivity) context).handleUserVoiceInput(text);
-                if (handled) return;
-                // if not handled by navigation, continue to AI processing
+                ((NavigationActivity) context).handleUserVoiceInput(text);
             } catch (Exception e) {
                 Log.e("PatrickAIEngine", "调用 NavigationActivity.handleUserVoiceInput 异常: " + e.getMessage());
             }
         }
+        // 支持视频界面的视觉查询触发（如“这是什么/画面是什么/现在前面是什么”）
+        try {
+            if (context != null && context.getClass().getSimpleName().equals("VideoActivity_pi")) {
+                try {
+                    boolean handled = ((com.example.myapplication.VideoActivity_pi) context).handleUserVoiceInput(text);
+                    if (handled) return;
+                } catch (Exception e) {
+                    Log.e("PatrickAIEngine", "调用 VideoActivity_pi.handleUserVoiceInput 异常: " + e.getMessage());
+                }
+            }
+        } catch (Exception ignored) {}
 
         if (state == State.THINKING) {
             Log.d("PatrickAIEngine", "AI正在思考，暂存新输入: " + text);
@@ -165,29 +174,11 @@ public class PatrickAIEngine {
     private void openNavigation() {
         Log.d("PatrickAIEngine", "openNavigation: 跳转导航界面，暂停AI语音监听");
         pauseListening(); // 新增：暂停AI语音识别
-        try {
-            android.content.Context ctx = context;
-            android.content.Intent intent = new android.content.Intent(ctx, NavigationActivity.class);
-            if (!(ctx instanceof android.app.Activity)) {
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
-            ctx.startActivity(intent);
-        } catch (Exception e) {
-            Log.e("PatrickAIEngine", "openNavigation 启动 NavigationActivity 失败: " + e.getMessage());
-        }
+        context.startActivity(new android.content.Intent(context, NavigationActivity.class));
     }
     // 打开视频
     private void openVideo() {
-        try {
-            android.content.Context ctx = context;
-            android.content.Intent intent = new android.content.Intent(ctx, VideoActivity_pi.class);
-            if (!(ctx instanceof android.app.Activity)) {
-                intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
-            ctx.startActivity(intent);
-        } catch (Exception e) {
-            Log.e("PatrickAIEngine", "openVideo 启动 VideoActivity_pi 失败: " + e.getMessage());
-        }
+        context.startActivity(new android.content.Intent(context, VideoActivity_pi.class));
     }
 
     // 智谱API调用
@@ -338,7 +329,7 @@ public class PatrickAIEngine {
         startListening();
     }
 
-    public static String parseIflytekResult(String json) {
+    private String parseIflytekResult(String json) {
         try {
             JSONObject resultJson = new JSONObject(json);
             JSONArray wsArray = resultJson.getJSONArray("ws");
