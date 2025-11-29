@@ -23,6 +23,11 @@ public class PatrickAIEngine {
     private boolean isListening = false;
     private Queue<String> pendingInputs = new LinkedList<>();
 
+    // 防止 TTS 自身被识别为用户说话：记录最近一次 TTS 文本与结束时间
+    private volatile String lastTtsSpoken = null;
+    private volatile long lastTtsEndMs = 0;
+    private static final long TTS_IGNORE_WINDOW_MS = 1500; // ms，识别结果在此窗口内若与 TTS 文本相似则忽略
+
     public PatrickAIEngine(Context context, Consumer<String> uiCallback) {
         this.context = context;
         this.uiCallback = uiCallback;
@@ -159,13 +164,17 @@ public class PatrickAIEngine {
         pauseListening();
         TTSHelper.speak(text, () -> {
             Log.d("PatrickAIEngine", "TTS播报完毕，恢复语音识别，state=" + state);
+            // 记录刚播的文本与结束时间，用于在短时间内过滤识别到的回声
+            lastTtsSpoken = text == null ? "" : text.trim();
+            lastTtsEndMs = System.currentTimeMillis();
             // 只有普通问答播报后才设为 READY
             if (state == State.SPEAKING || state == State.THINKING) {
                 Log.d("PatrickAIEngine", "TTS播报后，state变更前=" + state);
                 state = State.READY;
                 Log.d("PatrickAIEngine", "TTS播报后，state变更后=" + state);
             }
-            resumeListening();
+            // 延迟短时间再恢复识别，避免立即捕获 TTS 回声；同时 SDK 可能需要一点时间重建会话
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(this::resumeListening, 800);
             if (onDone != null) onDone.run();
         });
     }
@@ -352,8 +361,26 @@ public class PatrickAIEngine {
             Log.d("PatrickAIEngine", "RecognizerListener.onResult: " + json + ", isLast=" + isLast);
             String text = parseIflytekResult(json);
             Log.d("PatrickAIEngine", "RecognizerListener.onResult: 解析后文本: " + text);
+
             if (text != null && !text.trim().isEmpty()) {
-                onInput(text);
+                // 如果刚播了 TTS，并且识别结果在短时间窗口内与刚播文本高度相似，则很可能是回声，忽略
+                try {
+                    long now = System.currentTimeMillis();
+                    if (lastTtsSpoken != null && (now - lastTtsEndMs) < TTS_IGNORE_WINDOW_MS) {
+                        String normRec = text.trim().replaceAll("\\s+", "");
+                        String normTts = lastTtsSpoken.trim().replaceAll("\\s+", "");
+                        if (!normRec.isEmpty() && normTts.contains(normRec) || normRec.contains(normTts)) {
+                            Log.d("PatrickAIEngine", "忽略疑似回声识别结果: " + text);
+                        } else {
+                            onInput(text);
+                        }
+                    } else {
+                        onInput(text);
+                    }
+                } catch (Exception e) {
+                    Log.e("PatrickAIEngine", "处理 onResult 时异常: " + e.getMessage());
+                    onInput(text);
+                }
             }
             if (isLast) {
                 isListening = false;

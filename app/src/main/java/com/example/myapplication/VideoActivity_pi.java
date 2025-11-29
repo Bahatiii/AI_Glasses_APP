@@ -54,7 +54,7 @@ public class VideoActivity_pi extends AppCompatActivity {
     private volatile String raspiIp = null;
     private DatagramSocket udpSocket;
     private Thread udpDiscoverThread;
-
+/*
     // ========== 自动检测 + 播报部分 ==========
     private final Handler detectHandler = new Handler(Looper.getMainLooper());
     private static final long AUTO_DETECT_INTERVAL_MS = 15000; // 每15秒检测一次
@@ -136,6 +136,7 @@ public class VideoActivity_pi extends AppCompatActivity {
         }
     };
     // =========================================
+*/
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -372,7 +373,7 @@ public class VideoActivity_pi extends AppCompatActivity {
         webView.loadDataWithBaseURL("http://" + raspiIp + ":5000/", html, "text/html", "UTF-8", null);
 
         // ✅ 启动自动识别任务
-        detectHandler.postDelayed(detectRunnable, 4000);
+        //detectHandler.postDelayed(detectRunnable, 4000);
     }
 
     private void showSearchingStatus() {
@@ -407,30 +408,46 @@ public class VideoActivity_pi extends AppCompatActivity {
             return;
         }
 
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
+        Bitmap rawBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(rawBitmap);
         webView.draw(canvas);
+
+        // --- 按最长边缩放到 640px（防止 OOM / 大流量） ---
+        int maxEdge = 640;
+        int w = rawBitmap.getWidth(), h = rawBitmap.getHeight();
+        if (Math.max(w, h) > maxEdge) {
+            float scale = (float) maxEdge / Math.max(w, h);
+            Bitmap scaled = Bitmap.createScaledBitmap(rawBitmap, Math.max(1, Math.round(w * scale)),
+                    Math.max(1, Math.round(h * scale)), true);
+            try { rawBitmap.recycle(); } catch (Exception ignored) {}
+            rawBitmap = scaled;
+        }
+
+        // 固定为 final，供匿名内部类安全使用
+        final Bitmap bmpToUpload = rawBitmap;
 
         Toast.makeText(this, "截图成功，正在上传识别", Toast.LENGTH_SHORT).show();
         Log.d("OCR_DEBUG", "captureAndUploadFrame: 调用BaiduImageUploader");
 
-        BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
+        BaiduImageUploader.uploadImage(bmpToUpload, new BaiduImageUploader.UploadCallback() {
             @Override
             public void onSuccess(String resultJson) {
                 Log.d("OCR_DEBUG", "上传成功 JSON: " + resultJson);
-                // 将图片识别结果转发给 PatrickAI 做后续对话（保持原有上传日志）
                 try {
                     if (patrickAI != null) {
                         patrickAI.onInput("图片识别结果：" + resultJson);
                     }
                 } catch (Exception e) {
                     Log.e("VideoActivity_pi", "转发图片识别给 PatrickAI 失败: " + e.getMessage());
+                } finally {
+                    try { if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle(); } catch (Exception ignored) {}
                 }
             }
 
             @Override
             public void onError(String errorMessage) {
                 Log.e("OCR_DEBUG", "上传失败: " + errorMessage);
+                try { if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle(); } catch (Exception ignored) {}
             }
         });
     }
@@ -442,7 +459,11 @@ public class VideoActivity_pi extends AppCompatActivity {
         if (webView != null) webView.destroy();
         if (udpDiscoverThread != null && udpDiscoverThread.isAlive()) udpDiscoverThread.interrupt();
         if (udpSocket != null && !udpSocket.isClosed()) udpSocket.close();
-        detectHandler.removeCallbacks(detectRunnable);
+        if (pendingRecognitionBitmap != null && !pendingRecognitionBitmap.isRecycled()) {
+            try { pendingRecognitionBitmap.recycle(); } catch (Exception ignored) {}
+            pendingRecognitionBitmap = null;
+        }
+        //detectHandler.removeCallbacks(detectRunnable);
         TTSPlayer.shutdown();
         // 销毁/释放 Patrick 引擎，避免内存泄漏
         try {
@@ -475,17 +496,27 @@ public class VideoActivity_pi extends AppCompatActivity {
         }
     }
 
+    // 新增：等待用户选择识别类型的状态与缓存截图
+    private volatile boolean awaitingRecognitionChoice = false;
+    private Bitmap pendingRecognitionBitmap = null;
+
     public boolean handleUserVoiceInput(String text) {
         if (text == null) return false;
         String t = text.trim();
-        if (t.contains("这是什么") || t.contains("画面是什么") || t.contains("现在前面是什么") || t.contains("前面是什么") || t.contains("这是谁") || t.contains("识别一下")) {
+        // 如果正在等待用户在“文字/物体”间做选择，优先处理该回答
+        if (awaitingRecognitionChoice) {
+            handleRecognitionChoice(t);
+            return true;
+        }
+        if (t.contains("这是什么") || t.contains("画面是什么") || t.contains("现在前面是什么") ||
+                t.contains("前面是什么") || t.contains("这是谁") || t.contains("识别一下")) {
             performVisualRecognition(t);
             return true;
         }
         return false;
     }
 
-    // 执行一次性视觉识别：先尝试交通/目标检测（BaiduTraffic），若未检测到车辆则回退到图片 OCR（BaiduImageUploader）
+    // 修改：performVisualRecognition -> 截图并询问用户是“文字还是物体”
     private void performVisualRecognition(String userQuery) {
         try {
             if (webView == null || webView.getWidth() == 0 || webView.getHeight() == 0) {
@@ -496,96 +527,203 @@ public class VideoActivity_pi extends AppCompatActivity {
             Canvas canvas = new Canvas(bitmap);
             webView.draw(canvas);
 
-            // 先做交通/目标检测（更适合询问前面有什么车）
-            BaiduTraffic.detectTraffic(bitmap, new BaiduTraffic.TrafficCallback() {
+            // 缓存截图并等待用户选择识别类型
+            pendingRecognitionBitmap = bitmap;
+            awaitingRecognitionChoice = true;
+            if (patrickAI != null) patrickAI.speak("你是希望识别文字还是物体呢？");
+            else TTSPlayer.speak("你是希望识别文字还是物体呢？");
+
+        } catch (Exception e) {
+            Log.e("VideoActivity_pi", "performVisualRecognition 异常: " + e.getMessage());
+            if (patrickAI != null) patrickAI.speak("识别发生异常");
+        }
+    }
+
+    // 新增：处理用户对“文字还是物体”的回答
+    private void handleRecognitionChoice(String userReply) {
+        awaitingRecognitionChoice = false; // 先清标志，后续需要时可重置
+        if (pendingRecognitionBitmap == null) {
+            if (patrickAI != null) patrickAI.speak("没有可识别的画面。请再试一次。");
+            else TTSPlayer.speak("没有可识别的画面。请再试一次。");
+            return;
+        }
+        String lower = userReply.toLowerCase();
+        boolean wantText = lower.contains("字") || lower.contains("文") || lower.contains("文字") || lower.contains("识字");
+        boolean wantObject = lower.contains("物") || lower.contains("东西") || lower.contains("物体") || lower.contains("物品");
+
+        if (wantText && !wantObject) {
+            // 调用已有的文字识别上传流程
+            Bitmap bmp = pendingRecognitionBitmap;
+            pendingRecognitionBitmap = null;
+            Toast.makeText(this, "正在进行文字识别，请稍候", Toast.LENGTH_SHORT).show();
+            final Bitmap bmpToUpload = bmp;
+            BaiduImageUploader.uploadImage(bmpToUpload, new BaiduImageUploader.UploadCallback() {
                 @Override
                 public void onSuccess(String resultJson) {
                     try {
-                        JSONObject json = new JSONObject(resultJson);
-                        JSONObject vehicleNum = json.optJSONObject("vehicle_num");
-                        int total = 0;
-                        if (vehicleNum != null) {
-                            int car = vehicleNum.optInt("car", 0);
-                            int truck = vehicleNum.optInt("truck", 0);
-                            int bus = vehicleNum.optInt("bus", 0);
-                            int motorbike = vehicleNum.optInt("motorbike", 0);
-                            int tricycle = vehicleNum.optInt("tricycle", 0);
-                            total = car + truck + bus + motorbike + tricycle;
-                            if (total > 0) {
-                                StringBuilder sb = new StringBuilder();
-                                sb.append("识别到 ").append(total).append(" 辆车辆，");
-                                if (car > 0) sb.append(car).append(" 辆小汽车，");
-                                if (truck > 0) sb.append(truck).append(" 辆卡车，");
-                                if (bus > 0) sb.append(bus).append(" 辆公交车，");
-                                if (motorbike > 0) sb.append(motorbike).append(" 辆摩托车，");
-                                if (tricycle > 0) sb.append(tricycle).append(" 辆三轮车，");
-                                String speakText = sb.toString();
-                                if (speakText.endsWith("，")) speakText = speakText.substring(0, speakText.length()-1);
-                                if (patrickAI != null) {
-                                    patrickAI.speak("我看到：" + speakText);
-                                    patrickAI.onInput("图片识别结果：" + resultJson);
-                                } else {
-                                    TTSPlayer.speak("我看到：" + speakText);
-                                }
-                                return;
-                            }
+                        if (patrickAI != null) {
+                            patrickAI.speak("文字识别已完成，我正在理解结果");
+                            patrickAI.onInput("图片识别结果：" + resultJson);
+                        } else {
+                            TTSPlayer.speak("识别结果已返回");
                         }
-
-                        BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
-                            @Override
-                            public void onSuccess(String ocrJson) {
-                                try {
-                                    if (patrickAI != null) {
-                                        patrickAI.speak("识别结果已返回，请稍等片刻，我正在帮你理解");
-                                        patrickAI.onInput("图片识别结果：" + ocrJson);
-                                    } else {
-                                        TTSPlayer.speak("识别结果：" + ocrJson);
-                                    }
-                                } catch (Exception e) {
-                                    Log.e("VideoActivity_pi", "performVisualRecognition OCR 回调处理失败: " + e.getMessage());
-                                }
-                            }
-
-                            @Override
-                            public void onError(String errorMessage) {
-                                Log.e("VideoActivity_pi", "performVisualRecognition OCR 失败: " + errorMessage);
-                                if (patrickAI != null) patrickAI.speak("图像识别失败：" + errorMessage);
-                                else TTSPlayer.speak("图像识别失败");
-                            }
-                        });
                     } catch (Exception e) {
-                        Log.e("VideoActivity_pi", "performVisualRecognition 解析 traffic 结果失败: " + e.getMessage());
-                        if (patrickAI != null) patrickAI.speak("识别失败：" + e.getMessage());
+                        Log.e("VideoActivity_pi", "转发图片识别给 PatrickAI 失败: " + e.getMessage());
+                    } finally {
+                        try {
+                            if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle();
+                        } catch (Exception ignored) {}
                     }
                 }
-
                 @Override
                 public void onError(String errorMessage) {
-                    Log.e("VideoActivity_pi", "performVisualRecognition traffic 失败: " + errorMessage);
-                    // 当流量检测失败时，退回到 OCR
-                    BaiduImageUploader.uploadImage(bitmap, new BaiduImageUploader.UploadCallback() {
-                        @Override
-                        public void onSuccess(String ocrJson) {
-                            if (patrickAI != null) {
-                                patrickAI.speak("识别结果已返回，我已转发给AI进行理解。");
-                                patrickAI.onInput("图片识别结果：" + ocrJson);
-                            } else {
-                                TTSPlayer.speak("识别结果：" + ocrJson);
-                            }
-                        }
-
-                        @Override
-                        public void onError(String errorMessage2) {
-                            Log.e("VideoActivity_pi", "performVisualRecognition OCR 失败: " + errorMessage2);
-                            if (patrickAI != null) patrickAI.speak("图像识别失败：" + errorMessage2);
-                            else TTSPlayer.speak("图像识别失败");
-                        }
-                    });
+                    try {
+                        Log.e("VideoActivity_pi", "文字识别失败: " + errorMessage);
+                        if (patrickAI != null) patrickAI.speak("文字识别失败");
+                        else TTSPlayer.speak("文字识别失败");
+                    } finally {
+                        try {
+                            if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle();
+                        } catch (Exception ignored) {}
+                    }
                 }
             });
-        } catch (Exception e) {
-            Log.e("VideoActivity_pi", "performVisualRecognition 异常: " + e.getMessage());
-            if (patrickAI != null) patrickAI.speak("识别发生异常：" + e.getMessage());
+            return;
         }
+
+        if (wantObject && !wantText) {
+            // 调用远程 YOLO 识别（一次性）
+            pendingRecognitionBitmap = null;
+            triggerRemoteYoloDetection();
+            return;
+        }
+
+        // 无法判定，询问用户重试
+        if (patrickAI != null) patrickAI.speak("抱歉，我没听清。你是要识别文字还是物体呢？请再说一次。");
+        else TTSPlayer.speak("抱歉，我没听清。你是要识别文字还是物体呢？请再说一次。");
+        awaitingRecognitionChoice = true;
     }
+
+    // 新增：YOLO 识别防抖与方法（将请求 /api/detect，解析并播报；同时把原始结果发送给 PatrickAI 让其进一步润色）
+    private long lastYoloSpeakTime = 0;
+    private static final long YOLO_SPEAK_COOLDOWN_MS = 3000; // 最小间隔 ms
+
+    /**
+     * 异步向树莓派 /api/detect 请求一次 YOLO 识别，
+     * 解析返回 JSON，生成一段“人话”并用 TTS 播报；
+     * 同时把原始 JSON 发给 patrickAI.onInput 让 AI 进一步润色（异步）。
+     */
+    private void triggerRemoteYoloDetection() {
+        if (raspiIp == null) {
+            Toast.makeText(this, "未连接到树莓派", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastYoloSpeakTime < YOLO_SPEAK_COOLDOWN_MS) return; // 防抖
+
+        executor.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                URL url = new URL("http://" + raspiIp + ":5000/api/detect");
+                connection = (HttpURLConnection) url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.setConnectTimeout(TIMEOUT_MS);
+                connection.setReadTimeout(TIMEOUT_MS);
+
+                int code = connection.getResponseCode();
+                if (code != HttpURLConnection.HTTP_OK) {
+                    final int resp = code;
+                    mainHandler.post(() -> Toast.makeText(VideoActivity_pi.this,
+                            "识别请求失败: 服务器响应 " + resp, Toast.LENGTH_SHORT).show());
+                    return;
+                }
+
+                java.io.InputStream in = new java.io.BufferedInputStream(connection.getInputStream());
+                java.util.Scanner s = new java.util.Scanner(in).useDelimiter("\\A");
+                final String json = s.hasNext() ? s.next() : "";
+                in.close();
+
+                mainHandler.post(() -> {
+                    try {
+                        JSONObject obj = new JSONObject(json);
+                        if (!obj.optBoolean("success", false)) {
+                            String msg = obj.optString("message", "识别失败");
+                            if (patrickAI != null) patrickAI.speak(msg);
+                            else TTSPlayer.speak(msg);
+                            return;
+                        }
+
+                        JSONArray arr = obj.optJSONArray("objects");
+                        String speakText = beautifyYoloResult(arr);
+
+                        // 立即播报简短的结果
+                        if (patrickAI != null) {
+                            patrickAI.speak(speakText);
+                            // 把原始结果发给 AI，让 AI 做更自然的润色（异步）
+                            try {
+                                patrickAI.onInput("请把以下物体识别结果润色成自然口语并返回: " + json);
+                            } catch (Exception e) {
+                                // 忽略 onInput 抛错，不影响播报
+                            }
+                        } else {
+                            TTSPlayer.speak(speakText);
+                        }
+
+                        lastYoloSpeakTime = System.currentTimeMillis();
+                        Toast.makeText(VideoActivity_pi.this, speakText, Toast.LENGTH_LONG).show();
+
+                    } catch (Exception e) {
+                        Toast.makeText(VideoActivity_pi.this, "解析识别结果出错", Toast.LENGTH_SHORT).show();
+                        Log.e("VideoActivity_pi", "triggerRemoteYoloDetection 解析错误: " + e.getMessage());
+                    }
+                });
+
+            } catch (Exception e) {
+                final String msg = e.getMessage() == null ? e.toString() : e.getMessage();
+                mainHandler.post(() -> {
+                    Toast.makeText(VideoActivity_pi.this, "识别请求异常: " + msg, Toast.LENGTH_SHORT).show();
+                    Log.e("VideoActivity_pi", "triggerRemoteYoloDetection 异常: " + msg);
+                });
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
+    }
+
+    /**
+     * 简单把 YOLO 返回的 objects 数组美化为一句自然口语。
+     * 客户端做基础计数与置信度过滤，AI 会在后台进一步润色（如果可用）。
+     */
+    private String beautifyYoloResult(JSONArray arr) {
+        if (arr == null || arr.length() == 0) {
+            return "前方未识别到明显的物体。";
+        }
+        java.util.Map<String, Integer> countMap = new java.util.HashMap<>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            double conf = o.optDouble("confidence", 0.0);
+            if (conf < 0.1) continue; // 过滤低置信度
+            String label = o.optString("label", "物体");
+            countMap.put(label, countMap.getOrDefault(label, 0) + 1);
+        }
+        if (countMap.isEmpty()) return "前方未识别到明显的物体。";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("前方检测到");
+        int idx = 0;
+        for (java.util.Map.Entry<String, Integer> e : countMap.entrySet()) {
+            if (idx > 0) sb.append("，");
+            int cnt = e.getValue();
+            String label = e.getKey();
+            if (cnt == 1) sb.append("一").append(label);
+            else sb.append(cnt).append("个").append(label);
+            idx++;
+        }
+        sb.append("。");
+        return sb.toString();
+    }
+
 }
+
+
