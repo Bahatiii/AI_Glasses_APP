@@ -56,15 +56,19 @@ public class PatrickAIEngine {
         }
         // 支持视频界面的视觉查询触发（如“这是什么/画面是什么/现在前面是什么”）
         try {
-            if (context != null && context.getClass().getSimpleName().equals("VideoActivity_pi")) {
+            if (context instanceof com.example.myapplication.VideoActivity_pi) {
+                com.example.myapplication.VideoActivity_pi va = (com.example.myapplication.VideoActivity_pi) context;
+                Log.d("PatrickAIEngine", "尝试委托 VideoActivity_pi 处理输入");
                 try {
-                    boolean handled = ((com.example.myapplication.VideoActivity_pi) context).handleUserVoiceInput(text);
+                    boolean handled = va.handleUserVoiceInput(text);
+                    Log.d("PatrickAIEngine", "VideoActivity_pi.handleUserVoiceInput 返回 handled=" + handled);
                     if (handled) return;
                 } catch (Exception e) {
                     Log.e("PatrickAIEngine", "调用 VideoActivity_pi.handleUserVoiceInput 异常: " + e.getMessage());
                 }
             }
         } catch (Exception ignored) {}
+// ...existing code...
 
         if (state == State.THINKING) {
             Log.d("PatrickAIEngine", "AI正在思考，暂存新输入: " + text);

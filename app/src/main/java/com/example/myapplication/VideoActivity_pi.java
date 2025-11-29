@@ -435,7 +435,15 @@ public class VideoActivity_pi extends AppCompatActivity {
                 Log.d("OCR_DEBUG", "上传成功 JSON: " + resultJson);
                 try {
                     if (patrickAI != null) {
-                        patrickAI.onInput("图片识别结果：" + resultJson);
+                        patrickAI.speak("文字识别已返回，我来理解结果");
+                        String prompt = "图片识别结果：" + resultJson + "，请将结果润色成自然口语并简短返回。";
+                        patrickAI.callAI(prompt, aiResult -> {
+                            try {
+                                if (aiResult != null && !aiResult.trim().isEmpty()) {
+                                    patrickAI.speak(aiResult);
+                                }
+                            } catch (Exception ignored) {}
+                        });
                     }
                 } catch (Exception e) {
                     Log.e("VideoActivity_pi", "转发图片识别给 PatrickAI 失败: " + e.getMessage());
@@ -499,24 +507,32 @@ public class VideoActivity_pi extends AppCompatActivity {
     // 新增：等待用户选择识别类型的状态与缓存截图
     private volatile boolean awaitingRecognitionChoice = false;
     private Bitmap pendingRecognitionBitmap = null;
+    // 新增：当语音已包含“文字”相关关键词时，等待用户确认是否要识别文字
+    private volatile boolean expectingTextConfirmation = false;
 
     public boolean handleUserVoiceInput(String text) {
+        Log.d("VideoActivity_pi", "handleUserVoiceInput called, text=[" + text + "], awaitingRecognitionChoice=" + awaitingRecognitionChoice);
         if (text == null) return false;
         String t = text.trim();
+        Log.d("VideoActivity_pi", "handleUserVoiceInput normalized t=[" + t + "]");
         // 如果正在等待用户在“文字/物体”间做选择，优先处理该回答
         if (awaitingRecognitionChoice) {
             handleRecognitionChoice(t);
             return true;
         }
-        if (t.contains("这是什么") || t.contains("画面是什么") || t.contains("现在前面是什么") ||
-                t.contains("前面是什么") || t.contains("这是谁") || t.contains("识别一下")) {
+        // 扩展触发词：兼容常见说法（“识别文字”、“识别图片”、“识别+...” 等）
+        if (t.contains("这是什么") || t.contains("画面是什么") || t.contains("现在前面是什么")
+                || t.contains("前面是什么") || t.contains("这是谁") || t.contains("识别一下")
+                || t.contains("识别文字") || t.contains("识别文本") || t.contains("识别图片")
+                || (t.contains("识别") && (t.contains("字") || t.contains("文") || t.contains("图") || t.length() <= 4))) {
             performVisualRecognition(t);
             return true;
         }
+
         return false;
     }
 
-    // 修改：performVisualRecognition -> 截图并询问用户是“文字还是物体”
+    // 修改：performVisualRecognition -> 截图并根据语音内容直接走物体识别或等待确认文字识别
     private void performVisualRecognition(String userQuery) {
         try {
             if (webView == null || webView.getWidth() == 0 || webView.getHeight() == 0) {
@@ -527,11 +543,30 @@ public class VideoActivity_pi extends AppCompatActivity {
             Canvas canvas = new Canvas(bitmap);
             webView.draw(canvas);
 
-            // 缓存截图并等待用户选择识别类型
-            pendingRecognitionBitmap = bitmap;
-            awaitingRecognitionChoice = true;
-            if (patrickAI != null) patrickAI.speak("你是希望识别文字还是物体呢？");
-            else TTSPlayer.speak("你是希望识别文字还是物体呢？");
+            // 检查用户语音是否显式提到“文字/字/识别文字”等关键词
+            String low = userQuery == null ? "" : userQuery.toLowerCase();
+            boolean mentionsText = false;
+            String[] textKeywords = new String[] {
+                    "识别文字", "识别文本", "识别字", "识别一下文字", "识别一下字", "文字", "看一下文字", "看一下字", "读一下"
+            };
+            for (String k : textKeywords) {
+                if (low.contains(k)) { mentionsText = true; break; }
+            }
+            if (mentionsText) {
+                // 需要确认：先回收旧的 pendingRecognitionBitmap（若存在），再缓存当前截图
+                try { if (pendingRecognitionBitmap != null && !pendingRecognitionBitmap.isRecycled()) pendingRecognitionBitmap.recycle(); } catch (Exception ignored) {}
+                pendingRecognitionBitmap = bitmap;
+                awaitingRecognitionChoice = true;
+                expectingTextConfirmation = true;
+                if (patrickAI != null) patrickAI.speak("你是要识别文字吗？");
+                else TTSPlayer.speak("你是要识别文字吗？");
+            } else {
+                // 直接走物体识别（使用树莓派的 /api/detect），不保留截图
+                try { if (bitmap != null && !bitmap.isRecycled()) bitmap.recycle(); } catch (Exception ignored) {}
+                awaitingRecognitionChoice = false;
+                expectingTextConfirmation = false;
+                triggerRemoteYoloDetection();
+            }
 
         } catch (Exception e) {
             Log.e("VideoActivity_pi", "performVisualRecognition 异常: " + e.getMessage());
@@ -541,22 +576,86 @@ public class VideoActivity_pi extends AppCompatActivity {
 
     // 新增：处理用户对“文字还是物体”的回答
     private void handleRecognitionChoice(String userReply) {
-        awaitingRecognitionChoice = false; // 先清标志，后续需要时可重置
+        // 清标志由后续流程决定（避免重复）
+        awaitingRecognitionChoice = false;
+
         if (pendingRecognitionBitmap == null) {
+            expectingTextConfirmation = false;
             if (patrickAI != null) patrickAI.speak("没有可识别的画面。请再试一次。");
             else TTSPlayer.speak("没有可识别的画面。请再试一次。");
             return;
         }
+
         String lower = userReply.toLowerCase();
+        boolean answerYes = lower.contains("是") || lower.contains("对") || lower.contains("好的") || lower.contains("确定") || lower.contains("要") || lower.contains("可以");
+        boolean answerNo = lower.contains("不") || lower.contains("不是") || lower.contains("不要") || lower.contains("否") || lower.contains("不要的") || lower.contains("不是的");
+
+        if (expectingTextConfirmation) {
+            // 用户被问 "你是要识别文字吗？" —— 根据回答决定走 OCR 或物体识别
+            final Bitmap bmpToProcess = pendingRecognitionBitmap;
+            pendingRecognitionBitmap = null;
+            expectingTextConfirmation = false;
+
+            if (answerYes) {
+                Toast.makeText(this, "正在进行文字识别，请稍候", Toast.LENGTH_SHORT).show();
+                BaiduImageUploader.uploadImage(bmpToProcess, new BaiduImageUploader.UploadCallback() {
+                    @Override
+                    public void onSuccess(String resultJson) {
+                        try {
+                            if (patrickAI != null) {
+                                patrickAI.speak("文字识别已完成，我正在理解结果");
+                                String prompt = "图片识别结果：" + resultJson + "，请将结果润色成自然口语并简短返回。";
+                                patrickAI.callAI(prompt, aiResult -> {
+                                    try {
+                                        if (aiResult != null && !aiResult.trim().isEmpty()) patrickAI.speak(aiResult);
+                                    } catch (Exception ignored) {}
+                                });
+                            } else {
+                                TTSPlayer.speak("识别结果已返回");
+                            }
+                        } catch (Exception e) {
+                            Log.e("VideoActivity_pi", "转发图片识别给 PatrickAI 失败: " + e.getMessage());
+                        } finally {
+                            try { if (bmpToProcess != null && !bmpToProcess.isRecycled()) bmpToProcess.recycle(); } catch (Exception ignored) {}
+                        }
+                    }
+                    @Override
+                    public void onError(String errorMessage) {
+                        try {
+                            Log.e("VideoActivity_pi", "文字识别失败: " + errorMessage);
+                            if (patrickAI != null) patrickAI.speak("文字识别失败");
+                            else TTSPlayer.speak("文字识别失败");
+                        } finally {
+                            try { if (bmpToProcess != null && !bmpToProcess.isRecycled()) bmpToProcess.recycle(); } catch (Exception ignored) {}
+                        }
+                    }
+                });
+                return;
+            } else if (answerNo) {
+                // 否定 -> 去物体识别
+                try { if (bmpToProcess != null && !bmpToProcess.isRecycled()) bmpToProcess.recycle(); } catch (Exception ignored) {}
+                triggerRemoteYoloDetection();
+                return;
+            } else {
+                // 回答不明确，重新询问
+                pendingRecognitionBitmap = bmpToProcess; // 还原
+                awaitingRecognitionChoice = true;
+                expectingTextConfirmation = true;
+                if (patrickAI != null) patrickAI.speak("请回答是或否，你是要识别文字吗？");
+                else TTSPlayer.speak("请回答是或否，你是要识别文字吗？");
+                return;
+            }
+        }
+
+
+        // 兼容旧逻辑：若没有在等待“是否识别文字”的确认，但用户仍然在选择文字/物体（例如手动）
         boolean wantText = lower.contains("字") || lower.contains("文") || lower.contains("文字") || lower.contains("识字");
         boolean wantObject = lower.contains("物") || lower.contains("东西") || lower.contains("物体") || lower.contains("物品");
 
         if (wantText && !wantObject) {
-            // 调用已有的文字识别上传流程
-            Bitmap bmp = pendingRecognitionBitmap;
+            final Bitmap bmpToUpload = pendingRecognitionBitmap;
             pendingRecognitionBitmap = null;
             Toast.makeText(this, "正在进行文字识别，请稍候", Toast.LENGTH_SHORT).show();
-            final Bitmap bmpToUpload = bmp;
             BaiduImageUploader.uploadImage(bmpToUpload, new BaiduImageUploader.UploadCallback() {
                 @Override
                 public void onSuccess(String resultJson) {
@@ -570,9 +669,7 @@ public class VideoActivity_pi extends AppCompatActivity {
                     } catch (Exception e) {
                         Log.e("VideoActivity_pi", "转发图片识别给 PatrickAI 失败: " + e.getMessage());
                     } finally {
-                        try {
-                            if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle();
-                        } catch (Exception ignored) {}
+                        try { if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle(); } catch (Exception ignored) {}
                     }
                 }
                 @Override
@@ -582,9 +679,7 @@ public class VideoActivity_pi extends AppCompatActivity {
                         if (patrickAI != null) patrickAI.speak("文字识别失败");
                         else TTSPlayer.speak("文字识别失败");
                     } finally {
-                        try {
-                            if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle();
-                        } catch (Exception ignored) {}
+                        try { if (bmpToUpload != null && !bmpToUpload.isRecycled()) bmpToUpload.recycle(); } catch (Exception ignored) {}
                     }
                 }
             });
@@ -592,16 +687,20 @@ public class VideoActivity_pi extends AppCompatActivity {
         }
 
         if (wantObject && !wantText) {
-            // 调用远程 YOLO 识别（一次性）
-            pendingRecognitionBitmap = null;
+            // 物体识别（远程）
+            if (pendingRecognitionBitmap != null) {
+                try { if (!pendingRecognitionBitmap.isRecycled()) pendingRecognitionBitmap.recycle(); } catch (Exception ignored) {}
+                pendingRecognitionBitmap = null;
+            }
             triggerRemoteYoloDetection();
             return;
         }
 
-        // 无法判定，询问用户重试
+        // 无法判断，询问用户
         if (patrickAI != null) patrickAI.speak("抱歉，我没听清。你是要识别文字还是物体呢？请再说一次。");
         else TTSPlayer.speak("抱歉，我没听清。你是要识别文字还是物体呢？请再说一次。");
         awaitingRecognitionChoice = true;
+
     }
 
     // 新增：YOLO 识别防抖与方法（将请求 /api/detect，解析并播报；同时把原始结果发送给 PatrickAI 让其进一步润色）
@@ -659,11 +758,16 @@ public class VideoActivity_pi extends AppCompatActivity {
                         // 立即播报简短的结果
                         if (patrickAI != null) {
                             patrickAI.speak(speakText);
-                            // 把原始结果发给 AI，让 AI 做更自然的润色（异步）
+                            // 异步让 AI 润色：用 callAI，不作为“用户输入”
                             try {
-                                patrickAI.onInput("请把以下物体识别结果润色成自然口语并返回: " + json);
+                                String prompt = "请把以下物体识别结果润色成自然口语并返回: " + json;
+                                patrickAI.callAI(prompt, aiResult -> {
+                                    try {
+                                        if (aiResult != null && !aiResult.trim().isEmpty()) patrickAI.speak(aiResult);
+                                    } catch (Exception ignored) {}
+                                });
                             } catch (Exception e) {
-                                // 忽略 onInput 抛错，不影响播报
+                                Log.e("VideoActivity_pi", "调 AI 润色出错: " + e.getMessage());
                             }
                         } else {
                             TTSPlayer.speak(speakText);
